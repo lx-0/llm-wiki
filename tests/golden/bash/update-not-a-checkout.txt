@@ -1,0 +1,7 @@
+$ wiki update
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ Not a git checkout — <VAULT>/.wiki wasn't installed via install.sh. Manual update required.
+--- change ---
+(none)

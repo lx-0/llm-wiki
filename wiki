@@ -136,7 +136,7 @@ EOF
   # relocated — e.g. to keep the 770 MB of packfiles out of an iCloud-synced
   # vault. A `-d` test reports "not a checkout" for all three.
   if ! git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-    die "Not a git checkout — wiki/ wasn't installed via install.sh. Manual update required."
+    die "Not a git checkout — $WIKI_DIR wasn't installed via install.sh. Manual update required."
   fi
   if (( post_pull == 1 )); then
     _update_post_pull "$before" "$sync_skills"
@@ -252,9 +252,27 @@ _update_post_pull() {
     if [[ -e "$WIKI_DIR/.venv" && ! -L "$WIKI_DIR/.venv" ]]; then
       warn "stale in-vault environment at $WIKI_DIR/.venv is no longer used — remove it: rm -rf $(shell_quote "$WIKI_DIR/.venv")"
     fi
-    if ! grep -qs 'UV_PROJECT_ENVIRONMENT=' "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" \
-         "$ROOT_DIR/.claude/settings.json" "$ROOT_DIR/.codex/hooks.json" 2>/dev/null; then
-      warn "installed agent hooks still run the engine from the in-vault environment — re-run: wiki hooks install"
+    # A hook runs with the agent's environment, not this one, so each wiki hook command
+    # carries the variable literally (core/agents.py's hook_cmd). Judged per agent and
+    # scope on the wiki's own hook commands (core/agents.py's HOOK_CMD_RE), as `wiki
+    # doctor` judges them: with no wiki hook installed there is nothing to re-run, and
+    # another config naming the variable hides none of ours (until 0.7.27 one grep over
+    # four configs decided). Line by line: the engine writes one command per line.
+    local stale="" agent config scope file
+    for agent in claude:.claude/settings.json codex:.codex/hooks.json \
+                 gemini:.gemini/settings.json cursor:.cursor/hooks.json; do
+      config="${agent#*:}"
+      for scope in user project; do
+        if [[ "$scope" == user ]]; then file="$HOME/$config"; else file="$ROOT_DIR/$config"; fi
+        # no `grep -q` under pipefail: an early exit would SIGPIPE the first grep
+        if grep -sE "\\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)" "$file" \
+             | grep -v 'UV_PROJECT_ENVIRONMENT=' >/dev/null; then
+          stale+="${stale:+, }${agent%%:*} ($scope)"
+        fi
+      done
+    done
+    if [[ -n "$stale" ]]; then
+      warn "hooks still run the engine from the in-vault environment: $stale — re-run: wiki hooks install"
     fi
   fi
 

@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from ._oracle import (
     BASH_GOLDEN_DIR,
@@ -41,12 +42,14 @@ from ._oracle import (
     build_engine_template,
     build_fixture_vault,
     dump,
+    git,
     install_engine,
     manifest_diff,
     normalise,
     normalise_text,
     render_run,
     run_wiki,
+    track_local_origin,
     tree_manifest,
     write_uv_shim,
 )
@@ -61,6 +64,7 @@ READ_ONLY: dict[str, tuple[str, ...]] = {
     "setup-help": ("setup", "--help"),
     "skills-help": ("skills", "--help"),
     "update-help": ("update", "--help"),
+    "update-unknown-flag": ("update", "--nope"),
     "seed-help": ("seed", "--help"),
     # `wiki seed`'s argv before S04-T04 ports it: help after a flag (the dispatcher only
     # intercepts it first), and the refusals — none of them writes
@@ -122,8 +126,9 @@ def engine_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return build_engine_template(tmp_path_factory.mktemp("engine") / ".wiki")
 
 
-def _build_env(root: Path, template: Path) -> dict[str, Path]:
-    """A fixture vault with an engine copy, a scratch HOME and the uv shim under ``root``."""
+def _build_env(root: Path, template: Path, home: Path | None = None) -> dict[str, Path]:
+    """A fixture vault with an engine copy, a scratch HOME and the uv shim under ``root``
+    (HOME elsewhere when ``home`` is given)."""
     vault = build_fixture_vault(root)
     install_engine(vault, template)
     # `config status` probes Ollama at the configured URL: a closed local port answers the
@@ -133,7 +138,7 @@ def _build_env(root: Path, template: Path) -> dict[str, Path]:
         "models:\n  ollama_url: http://127.0.0.1:9\n",
         encoding="utf-8",
     )
-    home = root / "home"
+    home = home or root / "home"
     home.mkdir()
     bin_dir = root / "bin"
     write_uv_shim(bin_dir)
@@ -170,6 +175,22 @@ def _engine_revision(wiki: Path) -> str:
 def _placeholders(env: dict[str, Path]) -> dict[str, str]:
     revision = _engine_revision(env["vault"] / ".wiki")
     named = {revision: "<REV>", revision[:7]: "<REV>"} if revision else {}
+    if (env["root"] / "origin").is_dir():
+        # An update case (`track_local_origin`): the origin's head is what a pull brings
+        # in; the engine's upstream before the run, where the engine has diverged, is the
+        # commit the two share. Named, like the engine's own: the regex rule needs a digit.
+        for token, repo, ref in (
+            ("<NEW-REV>", env["root"] / "origin", "HEAD"),
+            ("<BASE-REV>", env["vault"] / ".wiki", "@{u}"),
+        ):
+            rev = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", ref],
+                capture_output=True,
+                text=True,
+                check=False,
+            ).stdout.strip()
+            if rev and rev not in named:
+                named |= {rev: token, rev[:7]: token}
     return {
         **named,
         str(env["vault"]): "<VAULT>",
@@ -179,9 +200,11 @@ def _placeholders(env: dict[str, Path]) -> dict[str, str]:
         str(REPO_ROOT): "<REPO>",
         # <VENV> is the engine's Python environment: the test venv the shim's `uv run`
         # execs, or the vault's own `.wiki/.venv` that the one hop (S01-T04) runs from — in
-        # the fixture a venv of links onto the test venv, the same interpreter either way
+        # the fixture a venv of links onto the test venv, the same interpreter either way.
+        # A cloud-synced vault's is `~/.venvs/<vault>-wiki` (`env["venv"]`), and a
+        # `.wiki/.venv` there is a stale one, which keeps its path.
         str(Path(sys.executable).parent.parent): "<VENV>",
-        str(env["vault"] / ".wiki" / ".venv"): "<VENV>",
+        str(env.get("venv", env["vault"] / ".wiki" / ".venv")): "<VENV>",
     }
 
 
@@ -479,6 +502,145 @@ def _engine_not_a_checkout(env: dict[str, Path]) -> None:
     shutil.rmtree(env["vault"] / ".wiki" / ".git")
 
 
+# `wiki update` before S05-T02 ports it: the engine tracks a local origin over file://
+
+
+def _config_on_the_current_schema(env: dict[str, Path]) -> None:
+    """The vault's config as the last update left it: migrated. The update's own migration
+    then has nothing to change, so these records stay put when a config knob is added (the
+    migration fills in every key of the schema); `test_update_applies_the_config_migration`
+    holds the write."""
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "migrations.migrate_config_keys",
+            "--vault",
+            str(env["vault"]),
+            "--apply",
+        ],
+        env={
+            **os.environ,
+            "HOME": str(env["home"]),
+            "PYTHONPATH": str(env["vault"] / ".wiki" / "scripts"),
+        },
+        check=True,
+        capture_output=True,
+    )
+
+
+def _engine_at_the_origins_head(env: dict[str, Path]) -> None:
+    track_local_origin(env["vault"] / ".wiki", env["root"] / "origin", ahead=False)
+    _config_on_the_current_schema(env)
+
+
+def _engine_a_commit_behind(env: dict[str, Path]) -> None:
+    track_local_origin(env["vault"] / ".wiki", env["root"] / "origin", ahead=True)
+    _config_on_the_current_schema(env)
+
+
+def _engine_behind_and_edited(env: dict[str, Path]) -> None:
+    """A tracked engine file edited by hand inside the vault — the dirty tree update guards."""
+    _engine_a_commit_behind(env)
+    readme = env["vault"] / ".wiki" / "templates" / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8") + "\nAn edit inside .wiki/.\n")
+
+
+def _engine_diverged(env: dict[str, Path]) -> None:
+    """A local engine commit the origin lacks, and the origin one ahead: no fast-forward."""
+    _engine_a_commit_behind(env)
+    wiki = env["vault"] / ".wiki"
+    (wiki / "LOCAL.md").write_text("a local engine commit\n", encoding="utf-8")
+    git(wiki, "add", "LOCAL.md")
+    git(wiki, "commit", "-q", "-m", "a local commit")
+    # git's own advice is git's, and its wording moves between versions (`git config set
+    # advice.diverging false` since 2.46); the refusal after it is the engine's
+    git(wiki, "config", "advice.diverging", "false")
+
+
+# The stash path, which asks only a terminal (`run_wiki(tty=True)`)
+
+
+def _first_line_replaced(path: Path, line: str) -> None:
+    rest = path.read_text(encoding="utf-8").split("\n", 1)[1]
+    path.write_text(f"{line}\n{rest}", encoding="utf-8")
+
+
+def _engine_edited_where_the_origin_changed(env: dict[str, Path]) -> None:
+    """The hand edit and the origin's newer commit change the same line of the engine's
+    templates/README.md: the stashed edit cannot go back on cleanly after the pull."""
+    wiki = env["vault"] / ".wiki"
+    origin = track_local_origin(wiki, env["root"] / "origin", ahead=False)
+    _config_on_the_current_schema(env)
+    _first_line_replaced(origin / "templates" / "README.md", "# A newer engine's wiki")
+    git(origin, "commit", "-q", "-am", "a newer engine")
+    _first_line_replaced(wiki / "templates" / "README.md", "# My own wiki")
+
+
+def _engine_diverged_and_edited(env: dict[str, Path]) -> None:
+    """A hand edit on top of a diverged engine: stashed, then the pull fails."""
+    _engine_diverged(env)
+    readme = env["vault"] / ".wiki" / "templates" / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8") + "\nAn edit inside .wiki/.\n")
+
+
+# A vault in iCloud Drive: the engine environment lives at ~/.venvs/<vault>-wiki
+
+
+def _cloud_vault_with_an_in_vault_venv(env: dict[str, Path]) -> None:
+    """Moved into iCloud Drive with the environment it had: a real `.wiki/.venv`, dead
+    weight now, and no agent hooks."""
+    _engine_a_commit_behind(env)
+    (env["vault"] / ".wiki" / ".venv" / "bin").mkdir(parents=True)
+
+
+def _claude_hooks(env: dict[str, Path], *, venv: str | None) -> None:
+    """User-scope Claude hooks as `wiki hooks install` writes them (`core/agents.hook_cmd`):
+    without ``venv`` as it did before the vault moved, running the in-vault environment."""
+    prefix = f"UV_PROJECT_ENVIRONMENT='{venv}' " if venv else ""
+    hooks = {
+        event: [
+            {
+                "matcher": "",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": f"cd '{env['vault'] / '.wiki'}' && {prefix}uv run python {script}",
+                        "timeout": timeout,
+                    }
+                ],
+            }
+        ]
+        for event, script, timeout in (
+            ("SessionStart", "hooks/session-start.py", 15),
+            ("SessionEnd", "hooks/session-end.py", 10),
+            ("PreCompact", "hooks/pre-compact.py", 10),
+        )
+    }
+    _write_json(env["home"] / ".claude" / "settings.json", {"hooks": hooks})
+
+
+def _cloud_vault_with_hooks_from_before_the_move(env: dict[str, Path]) -> None:
+    _cloud_vault_with_an_in_vault_venv(env)
+    _claude_hooks(env, venv=None)
+
+
+def _cloud_vault_with_current_hooks(env: dict[str, Path]) -> None:
+    _cloud_vault_with_an_in_vault_venv(env)
+    _claude_hooks(env, venv=str(env["venv"]))
+
+
+def _cloud_vault_with_old_hooks_in_two_agents(env: dict[str, Path]) -> None:
+    """Claude's user-scope hooks and Cursor's project-scope ones (its flat schema), both
+    from before the move."""
+    _cloud_vault_with_hooks_from_before_the_move(env)
+    command = f"cd '{env['vault'] / '.wiki'}' && uv run python hooks/session-start.py"
+    _write_json(
+        env["vault"] / ".cursor" / "hooks.json",
+        {"version": 1, "hooks": {"sessionStart": [{"command": command, "timeout": 15}]}},
+    )
+
+
 def _shortcut_path(env: dict[str, Path]) -> Path:
     link = env["home"] / ".local" / "bin" / "wiki"
     link.parent.mkdir(parents=True, exist_ok=True)
@@ -649,6 +811,13 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     ),
     "install-shortcut-regular-file": (("install-shortcut",), None, _regular_file_at_shortcut),
     "version-not-a-checkout": (("version",), None, _engine_not_a_checkout),
+    # `wiki update` before S05-T02: the pull, the guards, phase 2 from the pulled engine
+    "update-already-current": (("update",), None, _engine_at_the_origins_head),
+    "update-fast-forward": (("update",), None, _engine_a_commit_behind),
+    "update-no-skills": (("update", "--no-skills"), None, _engine_a_commit_behind),
+    "update-dirty-tree-headless": (("update",), None, _engine_behind_and_edited),
+    "update-diverged": (("update",), None, _engine_diverged),
+    "update-not-a-checkout": (("update",), None, _engine_not_a_checkout),
     # `wiki config` before S02-T02: a value that does not coerce writes nothing; bare
     # `wiki config` is the interactive editor — exit at once (8), or models (1) →
     # models.dream_model (4) → a value, then exit
@@ -673,9 +842,15 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
 
 
 def record_effect(
-    env: dict[str, Path], args: tuple[str, ...], stdin: str | None, prepare: Prepare
+    env: dict[str, Path],
+    args: tuple[str, ...],
+    stdin: str | None,
+    prepare: Prepare,
+    *,
+    tty: bool = False,
 ) -> str:
-    """Prepare, snapshot vault + HOME, run, snapshot again: the output and the change."""
+    """Prepare, snapshot vault + HOME, run, snapshot again: the output and the change
+    (``stdin`` typed into a terminal with ``tty``)."""
     if prepare is not None:
         prepare(env)
     placeholders = _placeholders(env)
@@ -685,13 +860,14 @@ def record_effect(
 
     vault_before = tree_manifest(env["vault"], skip=NOT_AN_EFFECT)
     home_before = tree_manifest(env["home"])
-    run = run_wiki(env["vault"], env["home"], env["bin"], *args, stdin=stdin)
+    run = run_wiki(env["vault"], env["home"], env["bin"], *args, stdin=stdin, tty=tty)
     change = manifest_diff(
         vault_before, tree_manifest(env["vault"], skip=NOT_AN_EFFECT), "<VAULT>", norm
     ) + manifest_diff(home_before, tree_manifest(env["home"]), "<HOME>", norm)
     text = render_run(args, run, placeholders)
     if stdin is not None:
-        text = text.replace("\nexit:", f"\nstdin: {stdin!r}\nexit:", 1)
+        typed = "typed into a terminal" if tty else "stdin"
+        text = text.replace("\nexit:", f"\n{typed}: {stdin!r}\nexit:", 1)
     return (
         text + "--- change ---\n" + normalise_text(change or "(none)\n", placeholders=placeholders)
     )
@@ -702,6 +878,111 @@ def test_bash_mutating_command_matches_golden(fresh_vault, request, name: str) -
     args, stdin, prepare = MUTATING[name]
     text = record_effect(fresh_vault, args, stdin, prepare)
     assert_matches_golden(request, f"{name}.txt", text, BASH_GOLDEN_DIR)
+
+
+# `wiki update` in a vault inside iCloud Drive, one commit behind its origin
+CLOUD_UPDATE: dict[str, Prepare] = {
+    "update-cloud-vault": _cloud_vault_with_an_in_vault_venv,
+    "update-cloud-vault-hooks-from-before-the-move": _cloud_vault_with_hooks_from_before_the_move,
+    "update-cloud-vault-hooks-current": _cloud_vault_with_current_hooks,
+}
+
+
+@pytest.fixture
+def cloud_vault(tmp_path: Path, engine_template: Path) -> dict[str, Path]:
+    """A fixture vault in iCloud Drive's folder layout, which `lib/common.sh`'s cloud rule
+    matches, and HOME outside it: the engine environment is `~/.venvs/<vault>-wiki`."""
+    root = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Documents"
+    root.mkdir(parents=True)
+    env = _build_env(root, engine_template, home=tmp_path / "home")
+    return {**env, "venv": env["home"] / ".venvs" / f"{env['vault'].name}-wiki"}
+
+
+# `wiki update` with a hand edit in the engine, on a terminal: (typed, preparation)
+UPDATE_ON_A_TTY: dict[str, tuple[str, Prepare]] = {
+    "update-stash-reapplied": ("y\n", _engine_behind_and_edited),
+    "update-stash-conflicts": ("y\n", _engine_edited_where_the_origin_changed),
+    "update-stash-declined": ("n\n", _engine_behind_and_edited),
+    "update-stash-pull-fails": ("y\n", _engine_diverged_and_edited),
+}
+
+
+def _engine_state(env: dict[str, Path]) -> str:
+    """What the stash path leaves in the engine checkout, which is no effect on the vault:
+    the tracked files changed by hand, and the stashes."""
+    wiki = str(env["vault"] / ".wiki")
+    status, stashes = (
+        subprocess.run(
+            ["git", "-C", wiki, *argv], capture_output=True, text=True, check=True
+        ).stdout
+        for argv in (("status", "--short", "--untracked-files=no"), ("stash", "list"))
+    )
+    return f"--- engine ---\nstatus:\n{status}stashes:\n{stashes}"
+
+
+@pytest.mark.parametrize("name", sorted(UPDATE_ON_A_TTY))
+def test_bash_update_on_a_terminal_matches_golden(fresh_vault, request, name: str) -> None:
+    typed, prepare = UPDATE_ON_A_TTY[name]
+    text = record_effect(fresh_vault, ("update",), typed, prepare, tty=True)
+    engine = normalise_text(_engine_state(fresh_vault), placeholders=_placeholders(fresh_vault))
+    assert_matches_golden(request, f"{name}.txt", text + engine, BASH_GOLDEN_DIR)
+
+
+@pytest.mark.parametrize("name", sorted(CLOUD_UPDATE))
+def test_bash_update_in_a_cloud_synced_vault_matches_golden(
+    cloud_vault, request, name: str
+) -> None:
+    text = record_effect(cloud_vault, ("update",), None, CLOUD_UPDATE[name])
+    assert_matches_golden(request, f"{name}.txt", text, BASH_GOLDEN_DIR)
+
+
+@pytest.mark.parametrize(
+    ("prepare", "named"),
+    [
+        (_cloud_vault_with_an_in_vault_venv, None),
+        (_cloud_vault_with_current_hooks, None),
+        (_cloud_vault_with_hooks_from_before_the_move, "claude (user)"),
+        (_cloud_vault_with_old_hooks_in_two_agents, "claude (user), cursor (project)"),
+    ],
+)
+def test_update_warns_only_about_installed_hooks_without_the_environment(
+    cloud_vault: dict[str, Path], prepare: Prepare, named: str | None
+) -> None:
+    """Until 0.7.27 one grep over four configs decided, so a cloud vault with no hook
+    installed at all heard that its "installed agent hooks still run the engine from the
+    in-vault environment". Judged per agent and scope on the wiki's own hook commands now,
+    as `wiki doctor` judges them, and the warning names which."""
+    assert prepare is not None
+    prepare(cloud_vault)
+
+    run = run_wiki(cloud_vault["vault"], cloud_vault["home"], cloud_vault["bin"], "update")
+
+    assert run.returncode == 0, run.stderr
+    warned = [line for line in run.stdout.splitlines() if "hooks still run" in line]
+    assert warned == ([] if named is None else [warned[0]])
+    if named is not None:
+        assert named in warned[0]
+
+
+def test_update_applies_the_config_migration(fresh_vault: dict[str, Path]) -> None:
+    """Phase 2 runs the config migration with `--apply`: a key the engine dropped leaves
+    the vault's config.yaml, with a backup. Asserted rather than recorded: the migration
+    fills in every key of the schema, so a record would move with each new knob."""
+    _engine_a_commit_behind(fresh_vault)
+    config = fresh_vault["vault"] / ".wiki" / "config.yaml"
+    data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    data["personal"]["calendar_work_keywords"] = ["standup"]  # dropped 2026-05-15 (M006)
+    config.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    backups = fresh_vault["vault"] / ".wiki" / "state" / "config-backups"
+    before = set(backups.iterdir())
+
+    run = run_wiki(fresh_vault["vault"], fresh_vault["home"], fresh_vault["bin"], "update")
+
+    assert run.returncode == 0, run.stderr
+    assert "calendar_work_keywords" in run.stderr
+    assert "calendar_work_keywords" not in config.read_text(encoding="utf-8")
+    (backup,) = set(backups.iterdir()) - before
+    assert "calendar_work_keywords" in backup.read_text(encoding="utf-8")
 
 
 def test_an_install_that_fails_is_not_reported_done(fresh_vault: dict[str, Path]) -> None:

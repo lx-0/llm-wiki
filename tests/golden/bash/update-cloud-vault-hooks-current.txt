@@ -1,0 +1,36 @@
+$ wiki update
+exit: 0
+--- stdout ---
+Pulling latest into <VAULT>/.wiki …
+Updating <REV>..<NEW-REV>
+Fast-forward
+ NEWS.md | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 NEWS.md
+✓ Updated <REV> → <NEW-REV>
+If hook payloads or config schema changed, you may want to re-run:
+  wiki hooks install      # to refresh agent hook configs
+Syncing Python dependencies (uv sync, idempotent) …
+Engine environment: <VENV> (outside cloud-synced storage)
+! stale in-vault environment at <VAULT>/.wiki/.venv is no longer used — remove it: rm -rf '<VAULT>/.wiki/.venv'
+Migrating config.yaml to current schema (idempotent) …
+Relocating operations log out of knowledge/ (idempotent) …
+✓ skills: +1 linked
+--- stderr ---
+From file://<ROOT>/origin
+   <REV>..<NEW-REV>  main       -> origin/main
+<CLOCK>           config.yaml is already on the current key schema — no change.
+<CLOCK>           Nothing to migrate — no knowledge/log.md (or quarantine variant) found at <VAULT>/knowledge
+--- change ---
++ <VAULT>/.claude/skills/use-llm-wiki
+    -> ../../.wiki/skills/use-llm-wiki
++ <VAULT>/.wiki/NEWS.md
+    A newer engine.
++ <HOME>/.venvs/vault-fixture-wiki/.wiki-synced
+    
++ <HOME>/.venvs/vault-fixture-wiki/bin/python
+    -> <VENV>/bin/python3
++ <HOME>/.venvs/vault-fixture-wiki/lib
+    -> <VENV>/lib
++ <HOME>/.venvs/vault-fixture-wiki/pyvenv.cfg
+    -> <VENV>/pyvenv.cfg

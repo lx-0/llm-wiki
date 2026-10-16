@@ -76,3 +76,14 @@ these refine the tasks when they are planned):
   sync the same way.
 - **Push only after the local full run has finished.** `790f93b` was red on main for ten
   minutes.
+
+**What T01 left for T02** (the record: 14 new goldens `tests/golden/bash/update-*.txt`):
+- **The refusal test runs `git pull` once update is ported.** In a dev checkout, `cli.main(
+  ["update"])` would pull the repository itself. The test changes before the dispatch does.
+- **One walker for the hook-environment check.** 0.7.27's bash greps line by line; the port
+  calls the walker `wiki doctor`'s `check_hooks_installed` uses, shared, not a third copy.
+- **The stash path has a terminal now:** `run_wiki(..., tty=True)` types into a pty, and
+  `record_effect(..., tty=True)` records it with the engine's status and stashes.
+- **The records hold the steady state.** The config migration's `--apply` is asserted
+  (`test_update_applies_the_config_migration`), not recorded. Each new knob would otherwise
+  move the records.

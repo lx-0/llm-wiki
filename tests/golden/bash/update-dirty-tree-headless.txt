@@ -1,0 +1,9 @@
+$ wiki update
+exit: 1
+--- stdout ---
+! Uncommitted changes in <VAULT>/.wiki (tracked engine files):
+ M templates/README.md
+--- stderr ---
+✗ Refusing to touch them non-interactively. Run `wiki update` from a terminal to stash, or commit/stash manually in <VAULT>/.wiki.
+--- change ---
+(none)

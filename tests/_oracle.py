@@ -311,6 +311,34 @@ def build_engine_template(wiki: Path) -> Path:
     return wiki
 
 
+def git(path: Path, *args: str) -> str:
+    """git in ``path`` with the template's fixed identity and dates, so a commit made in a
+    preparation has the same hash on every run and machine."""
+    return subprocess.run(
+        ["git", "-C", str(path), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, **_FIXED_GIT_ENV},
+    ).stdout.strip()
+
+
+def track_local_origin(wiki: Path, origin: Path, *, ahead: bool) -> Path:
+    """Make ``origin`` a clone of the engine checkout ``wiki``, and make ``wiki`` track it
+    over file:// (the template has no upstream, and a bare `git pull` needs one). With
+    ``ahead``, the origin gets one more commit — a `NEWS.md` — so `wiki update` has a
+    fast-forward to pull. No reset anywhere: ``wiki`` is cloned before the origin moves."""
+    subprocess.run(["git", "clone", "-q", str(wiki), str(origin)], check=True, capture_output=True)
+    git(wiki, "remote", "set-url", "origin", f"file://{origin}")
+    git(wiki, "fetch", "-q", "origin")
+    git(wiki, "branch", "-q", "--set-upstream-to=origin/main")
+    if ahead:
+        (origin / "NEWS.md").write_text("A newer engine.\n", encoding="utf-8")
+        git(origin, "add", "NEWS.md")
+        git(origin, "commit", "-q", "-m", "a newer engine")
+    return origin
+
+
 def install_engine(vault: Path, template: Path) -> Path:
     """Put a built engine template into ``vault/.wiki/`` (next to the fixture's state and
     config) and give the vault the `.obsidian/` the bash vault guard demands."""
@@ -375,19 +403,24 @@ def run_wiki(
     *args: str,
     stdin: str | None = None,
     extra_env: dict[str, str] | None = None,
+    tty: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Run the engine copy's `wiki` the way a non-interactive caller does: no TTY, a
     scratch HOME, PATH = the uv shim + the system dirs (where `jq` and `git` live on macOS
     and on the CI runner). ``stdin`` scripts the answers to the bash's line-based prompts
     (`lib/ui.sh` reads with `read -r`, and EOF takes the default); without it stdin is
     /dev/null. ``extra_env`` adds variables (a test's probe paths, an operator's
-    `UV_PROJECT_ENVIRONMENT`)."""
+    `UV_PROJECT_ENVIRONMENT`). With ``tty``, stdin is a terminal (a pty) that ``stdin`` is
+    typed into: `wiki update` asks before stashing only when stdin is one. Its echo stays
+    on the terminal; stdout and stderr are pipes, as without."""
     env = {
         "PATH": os.pathsep.join((str(bin_dir), "/usr/bin", "/bin")),
         "HOME": str(home),
         "PYTHONUTF8": "1",
         **(extra_env or {}),
     }
+    if tty:
+        return _run_on_a_tty([str(vault / ".wiki" / "wiki"), *args], vault, env, stdin or "")
     return subprocess.run(
         [str(vault / ".wiki" / "wiki"), *args],
         cwd=vault,
@@ -399,6 +432,30 @@ def run_wiki(
         timeout=180,
         check=False,
     )
+
+
+def _run_on_a_tty(
+    argv: list[str], cwd: Path, env: dict[str, str], typed: str
+) -> subprocess.CompletedProcess[str]:
+    """``argv`` with a pty for stdin, ``typed`` already in its input queue: a line-reading
+    prompt takes the next line whenever it asks."""
+    master, slave = os.openpty()
+    try:
+        with subprocess.Popen(
+            argv,
+            cwd=cwd,
+            env=env,
+            stdin=slave,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ) as proc:
+            os.write(master, typed.encode())
+            stdout, stderr = proc.communicate(timeout=180)
+    finally:
+        os.close(slave)
+        os.close(master)
+    return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
 
 
 # What a mutating command's effect is measured over: everything under the vault and under
@@ -483,19 +540,23 @@ _TIMESTAMP = re.compile(
 )
 _AGE = re.compile(r"\b\d+(\s*)(seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b")
 # Compact stamps in file names: `core/backup.py`'s `<file>.bak.YYYYmmdd-HHMMSS`
-# and `core/config_backup`'s `state/config-backups/config-YYYYmmdd-HHMMSS-ffffff.yaml`.
+# and `core/config_backup`'s `state/config-backups/config-YYYYmmdd-HHMMSS-ffffff.yaml`;
+# and the bash `wiki update`'s stash message, `wiki-update auto-stash YYYY-mm-dd-HHMMSS`.
 # Before the revision rule, which would otherwise take the date half for a hash.
-_COMPACT_STAMP = re.compile(r"\b\d{8}-\d{6}(?:-\d{6})?\b")
+_COMPACT_STAMP = re.compile(r"\b(?:\d{8}|\d{4}-\d{2}-\d{2})-\d{6}(?:-\d{6})?\b")
+# The clock that opens a `core/console` log line: `HH:MM:SS  <level>  <message>`.
+_CLOCK = re.compile(r"^\d{2}:\d{2}:\d{2}(?=  )", re.MULTILINE)
 
 
 def normalise_text(text: str, *, placeholders: dict[str, str]) -> str:
     """The volatile fragments of command output: the scratch paths (longest first), compact
-    stamps → <STAMP>, git revisions → <REV>, wall-clock timestamps → <TS>, relative ages →
-    "N <unit> ago"."""
+    stamps → <STAMP>, git revisions → <REV>, wall-clock timestamps → <TS>, a log line's
+    clock → <CLOCK>, relative ages → "N <unit> ago"."""
     for literal, token in sorted(placeholders.items(), key=lambda kv: -len(kv[0])):
         text = text.replace(literal, token)
     text = _COMPACT_STAMP.sub("<STAMP>", text)
     text = _TIMESTAMP.sub("<TS>", text)
+    text = _CLOCK.sub("<CLOCK>", text)
     text = _REVISION.sub("<REV>", text)
     return _AGE.sub(lambda m: f"N{m.group(1)}{m.group(2)} ago", text)
 

@@ -1,0 +1,21 @@
+$ wiki update
+typed into a terminal: 'y\n'
+exit: 1
+--- stdout ---
+! Uncommitted changes in <VAULT>/.wiki (tracked engine files):
+ M templates/README.md
+Stash these changes, update, then re-apply them? [y/N] Saved working directory and index state On main: wiki-update auto-stash <STAMP>
+✓ Stashed local changes (will re-apply after the pull if they merge cleanly).
+Pulling latest into <VAULT>/.wiki …
+! Restored your stashed changes (pull did not run).
+--- stderr ---
+From file://<ROOT>/origin
+   <BASE-REV>..<NEW-REV>  main       -> origin/main
+fatal: Not possible to fast-forward, aborting.
+✗ git pull failed (non-fast-forward or network). Resolve manually in <VAULT>/.wiki.
+--- change ---
+(none)
+--- engine ---
+status:
+ M templates/README.md
+stashes:

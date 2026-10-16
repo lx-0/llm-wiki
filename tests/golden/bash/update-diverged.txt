@@ -1,0 +1,11 @@
+$ wiki update
+exit: 1
+--- stdout ---
+Pulling latest into <VAULT>/.wiki …
+--- stderr ---
+From file://<ROOT>/origin
+   <BASE-REV>..<NEW-REV>  main       -> origin/main
+fatal: Not possible to fast-forward, aborting.
+✗ git pull failed (non-fast-forward or network). Resolve manually in <VAULT>/.wiki.
+--- change ---
+(none)

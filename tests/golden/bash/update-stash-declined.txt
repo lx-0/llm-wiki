@@ -1,0 +1,15 @@
+$ wiki update
+typed into a terminal: 'n\n'
+exit: 1
+--- stdout ---
+! Uncommitted changes in <VAULT>/.wiki (tracked engine files):
+ M templates/README.md
+Stash these changes, update, then re-apply them? [y/N] 
+--- stderr ---
+✗ Update aborted — uncommitted changes left in place. Commit or stash them, then re-run `wiki update`.
+--- change ---
+(none)
+--- engine ---
+status:
+ M templates/README.md
+stashes:

@@ -18,6 +18,22 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.27] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **`wiki update` in an iCloud vault no longer warns about hooks you never installed.** The
+  warning that agent hooks "still run the engine from the in-vault environment" came from
+  one search over four config files. It fired whenever none of them named the engine's
+  environment, even with no hook installed at all, and it never said which hooks it meant.
+  Now it looks at the wiki's own hooks of each agent (Claude, Codex, Gemini, Cursor), for
+  you and for the vault, as `wiki doctor` does. It warns only when one of them runs the old
+  environment, and it names them, e.g. `claude (user)`.
+- When the engine folder is not a git checkout, `wiki update` now names its real path. It
+  used to say `wiki/`.
+
 ## [0.7.26] — 2026-10-16
 
 **For your vault:** nothing to do.

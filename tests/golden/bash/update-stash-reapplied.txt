@@ -1,0 +1,36 @@
+$ wiki update
+typed into a terminal: 'y\n'
+exit: 0
+--- stdout ---
+! Uncommitted changes in <VAULT>/.wiki (tracked engine files):
+ M templates/README.md
+Stash these changes, update, then re-apply them? [y/N] Saved working directory and index state On main: wiki-update auto-stash <STAMP>
+✓ Stashed local changes (will re-apply after the pull if they merge cleanly).
+Pulling latest into <VAULT>/.wiki …
+Updating <REV>..<NEW-REV>
+Fast-forward
+ NEWS.md | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 NEWS.md
+✓ Re-applied your stashed changes cleanly.
+✓ Updated <REV> → <NEW-REV>
+If hook payloads or config schema changed, you may want to re-run:
+  wiki hooks install      # to refresh agent hook configs
+Syncing Python dependencies (uv sync, idempotent) …
+Migrating config.yaml to current schema (idempotent) …
+Relocating operations log out of knowledge/ (idempotent) …
+✓ skills: +1 linked
+--- stderr ---
+From file://<ROOT>/origin
+   <REV>..<NEW-REV>  main       -> origin/main
+<CLOCK>           config.yaml is already on the current key schema — no change.
+<CLOCK>           Nothing to migrate — no knowledge/log.md (or quarantine variant) found at <VAULT>/knowledge
+--- change ---
++ <VAULT>/.claude/skills/use-llm-wiki
+    -> ../../.wiki/skills/use-llm-wiki
++ <VAULT>/.wiki/NEWS.md
+    A newer engine.
+--- engine ---
+status:
+ M templates/README.md
+stashes:

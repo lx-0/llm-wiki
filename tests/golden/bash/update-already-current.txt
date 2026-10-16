@@ -1,0 +1,16 @@
+$ wiki update
+exit: 0
+--- stdout ---
+Pulling latest into <VAULT>/.wiki …
+Already up to date.
+✓ Already up to date (<REV>)
+Syncing Python dependencies (uv sync, idempotent) …
+Migrating config.yaml to current schema (idempotent) …
+Relocating operations log out of knowledge/ (idempotent) …
+✓ skills: +1 linked
+--- stderr ---
+<CLOCK>           config.yaml is already on the current key schema — no change.
+<CLOCK>           Nothing to migrate — no knowledge/log.md (or quarantine variant) found at <VAULT>/knowledge
+--- change ---
++ <VAULT>/.claude/skills/use-llm-wiki
+    -> ../../.wiki/skills/use-llm-wiki

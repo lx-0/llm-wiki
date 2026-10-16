@@ -1,0 +1,5 @@
+$ wiki update --nope
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ unknown flag: --nope

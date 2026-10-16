@@ -3502,3 +3502,19 @@ The child seeded a whole vault there: 31 files, `.obsidian/` and `.claude/` incl
 ### Lesson
 
 A port changes what every *refusal* test exercises. A test that pinned "this command is not ours" runs the command once it is ours. Grep the tests for the ported name before the switch, and give any guard against stray writes a session-level check, because child processes escape in-process patching.
+
+## Recording `wiki update`: the steady state goes into the record, the transition into an assertion (2026-10-16, M034-S05-T01, 0.7.27)
+
+### What happened
+
+- **The schema landed in the record.** The fixture vault's config holds one key, so the update's config migration filled in all 120 others. Three records carried the whole schema, and every new knob would have moved them.
+- **A warning fired with no hook installed.** In a cloud-synced vault the update printed "installed agent hooks still run the engine from the in-vault environment" with no hook anywhere. One `grep -qs UV_PROJECT_ENVIRONMENT=` over four configs decided: a cruder copy of the rule `wiki doctor` applies per agent and scope. Fixed in the bash first (0.7.27), then recorded.
+- **git's own advice is versioned text.** Under a refused fast-forward it reads `git config set advice.diverging false` since git 2.46, so a record of it depends on the runner's git.
+- **The shared base looked like HEAD.** In the diverged record the fetch line `<old>..<new>` carried the commit the engine and the origin share, and the generic revision regex wrote it as `<REV>`, the token of the engine's HEAD. It would have escaped entirely as an all-letter hash.
+
+### Lessons
+
+1. **Record the steady state, assert the transition.** The preparation migrates the config first, as the last update would have, so the update's migration says "no change". `test_update_applies_the_config_migration` holds the `--apply` with a dropped key and a backup.
+2. **Name every revision a record can carry.** That means the origin's head (`<NEW-REV>`) and the shared base (`<BASE-REV>`) as well as HEAD (`<REV>`). The regex rule is the fallback, not the plan.
+3. **Another tool's wording is switched off in the fixture** (`advice.diverging=false`), not recorded.
+4. **A second copy of a judgment drifts.** The port calls one walker for the hook-environment check, shared with `wiki doctor`'s `check_hooks_installed`; the bash's line-by-line grep only had to hold until then.
