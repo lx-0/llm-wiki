@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 5
+completed_tasks: 6
 ---
 
 # M034-S06 -- Slice Plan
@@ -50,7 +50,7 @@ completed_tasks: 5
 - [x] T05 -- Surfaces: `README.md` ≤ 300 lines and `AGENTS.md` ≤ 250, each section naming its
   reader; the TUI's ✨ glyph and the commit hash in its header are removed. The doc audit
   finds no stale names.
-- [ ] T06 -- Release 0.8.0:
+- [x] T06 -- Release 0.8.0:
   - CHANGELOG with the "For your vault" section, version and lock;
   - engine-layout, FEATURES and cli.md current;
   - the DECISIONS milestone entry against the nine exit criteria;

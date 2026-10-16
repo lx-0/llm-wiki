@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T06:05:00+02:00
+last_updated: 2026-10-16T05:50:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: T06
+active_task: T07
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,12 +14,19 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 / S06 / T06 planned — ready to execute (`M034-S06-T06-PLAN.md`: release
-0.8.0 with "For your vault" across 0.7.20–0.7.34; `docs/cli.md` gains rows for the ten
-catalogue commands it never showed, with `tests/test_cli_docs.py` as the guard; the DECISIONS
-milestone entry against the nine exit criteria; the diagrams stay — no box names an
-M034-moved component — and their stale piggyback panel goes to the backlog). S06: 5/7 done.
-Slices S01–S05 are complete (5/6).
+**Status:** M034 / S06 / T07 planned — ready to execute (`M034-S06-T07-PLAN.md`: the
+backlog fan-out over 85 open items against the code with every shipped / superseded verdict
+refuted first, the PRIORITY.md re-cut with the coverage check empty, then reassess-roadmap
+closes the milestone). S06: 6/7 done. Slices S01–S05 are complete (5/6).
+
+T06 closed (`M034-S06-T06-SUMMARY.md`): **engine 0.8.0 released**.
+- The CHANGELOG's "For your vault" covers an engine of 0.7.3 or older.
+- `docs/cli.md` lists every catalogue command, held by `tests/test_cli_docs.py`.
+- The output gate covers `cli.py` too.
+- `triage` / `dream-entity` help name their real verbs and flags.
+- The DECISIONS milestone entry takes the nine criteria one by one.
+- New backlog: `agent-task-write-scope.md` (security-relevant) and
+  `architecture-diagram-stale-panels.md`.
 
 T05 closed (`M034-S06-T05-SUMMARY.md`): the surfaces (0.7.34), exit criterion 7 met.
 - README 378 → 295 lines (32.1 → 26.3 KB), AGENTS.md 326 → 248 (48.8 → 29.7 KB). Each Contents
