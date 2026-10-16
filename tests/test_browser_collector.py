@@ -206,6 +206,34 @@ def test_scan_firefox_places_no_op_for_directory():
     assert scan_browser.scan_firefox_places(Path()) is None
 
 
+def test_places_rows_still_in_the_write_ahead_log_are_read(tmp_path):
+    """Firefox keeps places.sqlite in WAL mode: recent visits and bookmarks live in
+    `places.sqlite-wal` until a checkpoint. Copying the main file alone missed them (the
+    live profile had a 4 MB WAL newer than the database, M034-S06-T07)."""
+    from collectors import scan_browser
+
+    places = tmp_path / "places.sqlite"
+    _seed_firefox_places(places)
+    writer = sqlite3.connect(str(places))
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute(
+            "INSERT INTO moz_places VALUES (2, 'https://fresh-site.org/', 'Fresh', 4, 1800000000000000)"
+        )
+        writer.execute("INSERT INTO moz_historyvisits VALUES (2, 1800000000000000)")
+        writer.commit()
+        assert (tmp_path / "places.sqlite-wal").stat().st_size > 0  # the row is in the WAL
+
+        result = scan_browser.scan_firefox_places(places)
+    finally:
+        writer.close()
+
+    assert result is not None
+    assert "fresh-site.org" in {h["domain"] for h in result["history_top"]}
+    assert result["history_total_visits"] == 2
+
+
 def test_clean_domain_filters_skip_list():
     from collectors import scan_browser
 

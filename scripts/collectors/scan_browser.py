@@ -115,6 +115,28 @@ def scan_stg(backup_dir: Path) -> dict | None:
 
 # ── Firefox Bookmarks + History ───────────────────────────────────────
 
+# A SQLite database in WAL mode is the main file PLUS its `-wal` (and `-shm`): Firefox keeps
+# places.sqlite that way, and recent visits and bookmarks sit in the WAL until a checkpoint.
+_SQLITE_SIDECARS = ("-wal", "-shm")
+
+
+def _copy_sqlite(src: Path, dst: Path) -> None:
+    """Copy a live SQLite database with its WAL, so the copy sees every committed row
+    (M034-S06-T07: the main file alone missed what was still in the WAL). A stale `-wal`
+    beside ``dst`` from an earlier run is removed first — SQLite would replay it."""
+    _remove_sqlite(dst)
+    shutil.copy2(src, dst)
+    for suffix in _SQLITE_SIDECARS:
+        sidecar = src.with_name(src.name + suffix)
+        if sidecar.is_file():
+            shutil.copy2(sidecar, dst.with_name(dst.name + suffix))
+
+
+def _remove_sqlite(path: Path) -> None:
+    path.unlink(missing_ok=True)
+    for suffix in _SQLITE_SIDECARS:
+        path.with_name(path.name + suffix).unlink(missing_ok=True)
+
 
 def scan_firefox_places(places_path: Path) -> dict | None:
     """Scan Firefox places.sqlite for bookmarks and history."""
@@ -124,7 +146,7 @@ def scan_firefox_places(places_path: Path) -> dict | None:
         return None
 
     tmp = Path("/tmp/ff-places-scan.sqlite")
-    shutil.copy2(places_path, tmp)
+    _copy_sqlite(places_path, tmp)
     db = sqlite3.connect(str(tmp))
     cur = db.cursor()
 
@@ -200,7 +222,7 @@ def scan_firefox_places(places_path: Path) -> dict | None:
     total_visits = cur.fetchone()[0]
 
     db.close()
-    tmp.unlink(missing_ok=True)
+    _remove_sqlite(tmp)
 
     # Bookmark folders
     bm_folders = Counter()
@@ -212,7 +234,7 @@ def scan_firefox_places(places_path: Path) -> dict | None:
     form_history = places_path.parent / "formhistory.sqlite"
     if form_history.exists():
         tmp_fh = Path("/tmp/ff-formhistory-scan.sqlite")
-        shutil.copy2(form_history, tmp_fh)
+        _copy_sqlite(form_history, tmp_fh)
         # A broken formhistory DB loses only the search-history section,
         # not the whole scan — but it must say so in the log.
         with swallow("firefox search-history scan", logger=log):
@@ -230,7 +252,7 @@ def scan_firefox_places(places_path: Path) -> dict | None:
                         dt = datetime.fromtimestamp(last_used / 1_000_000).strftime("%Y-%m-%d")
                 searches.append({"query": value, "times": times, "last_used": dt})
             fh_db.close()
-        tmp_fh.unlink(missing_ok=True)
+        _remove_sqlite(tmp_fh)
 
     # Google searches from URL history
     google_searches = []

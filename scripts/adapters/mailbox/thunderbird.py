@@ -296,7 +296,9 @@ def _iter_deep(
         log.warning("ThunderbirdMboxReader: cannot open %s: %s", path, e)
         return
 
-    for key in mbox.keys():  # noqa: SIM118  mailbox.Mailbox iterates MESSAGES; .keys() iterates keys
+    # Newest first: an mbox appends new mail at its end, and a capped deep scan (curiosity
+    # asks for 50) must see the latest mail, not the top of the file (M034-S06-T07).
+    for key in reversed(mbox.keys()):  # .keys(): mailbox.Mailbox iterates MESSAGES
         try:
             msg = mbox[key]
         except Exception:

@@ -399,6 +399,27 @@ def test_scan_deep_finds_messages_via_alias(tmp_path: Path) -> None:
     assert messages[0].meta.subject == "Test contract"
 
 
+def test_a_capped_deep_scan_takes_the_newest_appended_messages(tmp_path: Path) -> None:
+    """An mbox appends new mail at its end. A capped deep scan read from the top and took
+    the oldest messages, while curiosity asks for the newest (M034-S06-T07)."""
+    import mailbox
+
+    box = mailbox.mbox(str(tmp_path / "INBOX"))
+    for n in range(1, 6):
+        msg = mailbox.mboxMessage()
+        msg["From"] = "a@example.com"
+        msg["Subject"] = f"mail {n}"
+        msg["Date"] = f"Mon, {n:02d} Jun 2026 10:00:00 +0000"
+        msg.set_payload(f"body {n}")
+        box.add(msg)
+    box.flush()
+
+    reader = ThunderbirdMboxReader("testacct", [tmp_path])
+    got = [m.meta.subject for m in reader.scan_deep("INBOX", limit=2)]
+
+    assert got == ["mail 5", "mail 4"]
+
+
 def test_scan_deep_survives_header_object_content_disposition(tmp_path: Path) -> None:
     """Real mboxes contain Content-Disposition headers with raw 8-bit
     bytes (legacy senders, no RFC2047 encoding). The email package's

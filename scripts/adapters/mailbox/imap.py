@@ -201,11 +201,15 @@ class ImapReader:
                         "ImapReader[%s]: deep scan of %r failed: %s", self._account_id, norm_name, e
                     )
                     continue
+                # Newest first: UIDs ascend with arrival, and a capped scan (curiosity asks
+                # for 50) must see the latest mail, not the folder's oldest (M034-S06-T07).
+                uids = sorted(uids, reverse=True)
                 for batch in _chunks(uids, _FETCH_BATCH):
                     fetched = client.fetch(
                         batch, ["ENVELOPE", "RFC822.SIZE", "INTERNALDATE", "RFC822"]
                     )
-                    for uid, data in fetched.items():
+                    for uid in sorted(fetched, reverse=True):
+                        data = fetched[uid]
                         date = _message_date(data)
                         if since is not None and (date is None or date < since):
                             continue

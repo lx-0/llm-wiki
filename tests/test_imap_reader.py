@@ -230,3 +230,22 @@ def test_resolve_reader_dispatches_imap_kind() -> None:
     # imap_user_env unset → user falls back to account.email.
     assert reader._default_user == "alex@example.com"
     assert reader._host == "imap.gmail.com"
+
+
+# ── scan_deep ────────────────────────────────────────────────────────
+
+
+def test_a_capped_deep_scan_takes_the_newest_messages() -> None:
+    """IMAP UIDs ascend with arrival, so `SEARCH ALL` lists the oldest first. A capped deep
+    scan (curiosity asks for 50) took the 50 OLDEST: the live 2026-10-14 scan of one folder
+    returned mail from 2019 (M034-S06-T07). The cap now keeps the newest."""
+    FakeIMAPClient.FOLDERS = {
+        "INBOX": {
+            uid: _fetch_row(f"mail {uid}", "a@x.com", datetime(2026, 5, uid, tzinfo=UTC))
+            for uid in range(1, 11)
+        }
+    }
+
+    got = [m.meta.subject for m in _reader().scan_deep("INBOX", limit=3)]
+
+    assert got == ["mail 10", "mail 9", "mail 8"]
