@@ -154,21 +154,24 @@ def fresh_vault(tmp_path: Path, engine_template: Path) -> dict[str, Path]:
 
 @functools.cache
 def _engine_revision(wiki: Path) -> str:
-    """The engine copy's commit. It depends on the engine's content, so the regex rule for
-    revisions, which needs a digit, misses it whenever the short form happens to be all
-    letters (`fafcffa`, M034-S04-T04); named here, it is replaced whatever it looks like."""
+    """The engine copy's commit, or "" when the case took its checkout away. It depends on
+    the engine's content, so the regex rule for revisions, which needs a digit, misses it
+    whenever the short form happens to be all letters (`fafcffa`, M034-S04-T04); named here,
+    it is replaced whatever it looks like."""
     run = subprocess.run(
         ["git", "-C", str(wiki), "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
-    return run.stdout.strip()
+    return run.stdout.strip() if run.returncode == 0 else ""
 
 
 def _placeholders(env: dict[str, Path]) -> dict[str, str]:
     revision = _engine_revision(env["vault"] / ".wiki")
+    named = {revision: "<REV>", revision[:7]: "<REV>"} if revision else {}
     return {
+        **named,
         str(env["vault"]): "<VAULT>",
         str(env["home"]): "<HOME>",
         str(env["bin"]): "<BIN>",
@@ -179,8 +182,6 @@ def _placeholders(env: dict[str, Path]) -> dict[str, str]:
         # the fixture a venv of links onto the test venv, the same interpreter either way
         str(Path(sys.executable).parent.parent): "<VENV>",
         str(env["vault"] / ".wiki" / ".venv"): "<VENV>",
-        revision: "<REV>",
-        revision[:7]: "<REV>",
     }
 
 
