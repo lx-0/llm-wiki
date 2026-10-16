@@ -1,0 +1,8 @@
+$ wiki seed --extract-custom .obsidian/nope.json
+exit: 1
+--- stdout ---
+wiki seed --extract-custom
+.obsidian/nope.json
+
+--- stderr ---
+✗ no engine template for '.obsidian/nope.json' (not an overlay-managed file)

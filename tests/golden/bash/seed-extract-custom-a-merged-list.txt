@@ -1,0 +1,8 @@
+$ wiki seed --extract-custom .obsidian/community-plugins.json
+exit: 1
+--- stdout ---
+wiki seed --extract-custom
+.obsidian/community-plugins.json
+
+--- stderr ---
+✗ .obsidian/community-plugins.json is merged by seed, not derived from an overlay — there is nothing to capture

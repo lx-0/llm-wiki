@@ -1,0 +1,5 @@
+$ wiki seed --extract-custom
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ usage: wiki seed --extract-custom <vault-relative-path>

@@ -1,0 +1,5 @@
+$ wiki seed a.md b.md
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ wiki seed takes at most one path (got 'a.md' and 'b.md')

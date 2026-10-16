@@ -18,6 +18,19 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.24] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **`wiki seed --extract-custom` names the right cause when a file has no overlay.**
+  - Only the JSON configs under `.obsidian/` that seed derives from a template carry an
+    overlay.
+  - For `README.md` the capture said "not valid JSON". For a list seed merges, such as
+    `community-plugins.json`, it said "could not compute the drift".
+  - It now says that seed merges the file, or that the file is not overlay-managed.
+
 ## [0.7.23] — 2026-10-16
 
 **For your vault:** this matters only if you keep overlays in `.wiki/custom/`. Capture them

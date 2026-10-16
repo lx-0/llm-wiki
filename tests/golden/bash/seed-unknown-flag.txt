@@ -1,0 +1,5 @@
+$ wiki seed --nope
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ unknown flag: --nope

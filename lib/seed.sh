@@ -200,6 +200,20 @@ _extract_overlay() {  # $1=rel $2=target $3=templates_dir
   local base="$templates_dir/$rel" dst="$target/$rel"
   local overlay; overlay="$(_custom_root "$target")/$rel"
   command -v jq >/dev/null 2>&1 || { err "jq required for --extract-custom"; return 1; }
+  # Only the JSON configs seed derives as template ⊕ overlay have a drift to capture —
+  # not the ones it merges, nor a markdown file. Asking for one named the wrong cause
+  # ("not valid JSON", "could not compute the drift").
+  case "$rel" in
+    .obsidian/community-plugins.json|.obsidian/appearance.json|\
+    .obsidian/plugins/obsidian-meta-bind-plugin/data.json|\
+    .obsidian/plugins/obsidian-shellcommands/data.json)
+      err "$rel is merged by seed, not derived from an overlay — there is nothing to capture"
+      return 1 ;;
+    .obsidian/*.json) ;;
+    *)
+      err "'$rel' is not overlay-managed (overlays are for the JSON configs under .obsidian/)"
+      return 1 ;;
+  esac
   [[ -f "$base" ]] || { err "no engine template for '$rel' (not an overlay-managed file)"; return 1; }
   [[ -f "$dst" ]]  || { err "no live file at $dst"; return 1; }
   _is_json "$dst" || { err "$rel is not valid JSON — there is no drift to capture (fix it first)"; return 1; }

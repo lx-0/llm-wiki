@@ -61,6 +61,20 @@ READ_ONLY: dict[str, tuple[str, ...]] = {
     "skills-help": ("skills", "--help"),
     "update-help": ("update", "--help"),
     "seed-help": ("seed", "--help"),
+    # `wiki seed`'s argv before S04-T04 ports it: help after a flag (the dispatcher only
+    # intercepts it first), and the refusals — none of them writes
+    "seed-help-after-a-flag": ("seed", "--force", "--help"),
+    "seed-unknown-flag": ("seed", "--nope"),
+    "seed-two-paths": ("seed", "a.md", "b.md"),
+    "seed-extract-custom-without-a-path": ("seed", "--extract-custom"),
+    # what --extract-custom refuses before reading the live file (0.7.24)
+    "seed-extract-custom-a-merged-list": (
+        "seed",
+        "--extract-custom",
+        ".obsidian/community-plugins.json",
+    ),
+    "seed-extract-custom-not-a-config": ("seed", "--extract-custom", "README.md"),
+    "seed-extract-custom-no-template": ("seed", "--extract-custom", ".obsidian/nope.json"),
     "menu-help": ("menu", "--help"),
     "doctor-help": ("doctor", "--help"),
     "dream-help": ("dream", "--help"),
@@ -298,6 +312,11 @@ def _graph_tags_turned_off(env: dict[str, Path]) -> None:
     data["showTags"] = False
     data["scale"] = 2
     graph.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _graph_now_a_list(env: dict[str, Path]) -> None:
+    _seeded(env)
+    (env["vault"] / ".obsidian" / "graph.json").write_text('[{"scale": 2}]\n', encoding="utf-8")
 
 
 def _graph_overlay_not_json_and_a_live_edit(env: dict[str, Path]) -> None:
@@ -592,6 +611,13 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
         ("seed", "--extract-custom", ".obsidian/graph.json"),
         None,
         _graph_tags_turned_off,
+    ),
+    # before S04-T04: an overlay-managed config that became a JSON list — its leaf diff has
+    # no object to go into (jq's setpath refuses a number key on {})
+    "seed-extract-custom-config-now-a-list": (
+        ("seed", "--extract-custom", ".obsidian/graph.json"),
+        None,
+        _graph_now_a_list,
     ),
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),

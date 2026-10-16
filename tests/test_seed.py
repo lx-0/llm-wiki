@@ -294,6 +294,27 @@ def test_extract_custom_keeps_a_setting_turned_off(env: dict[str, Path]) -> None
     assert _read(env, GRAPH)["showTags"] is False
 
 
+def test_extract_custom_refuses_a_file_seed_merges(env: dict[str, Path]) -> None:
+    """community-plugins.json has a template, so the capture went on, and on a changed list
+    it said "could not compute the drift" — the cause is that seed merges it (0.7.24)."""
+    _seed(env)
+    _write(env, COMMUNITY, _read(env, COMMUNITY)[1:])
+    run = run_wiki(
+        env["vault"], env["home"], env["bin"], "seed", "--extract-custom", str(COMMUNITY)
+    )
+    assert run.returncode == 1
+    assert "merged by seed" in run.stderr
+    assert not (env["vault"] / ".wiki" / "custom" / COMMUNITY).exists()
+
+
+def test_extract_custom_refuses_a_file_without_an_overlay(env: dict[str, Path]) -> None:
+    """README.md has a template too; the capture called it "not valid JSON" (0.7.24)."""
+    _seed(env)
+    run = run_wiki(env["vault"], env["home"], env["bin"], "seed", "--extract-custom", "README.md")
+    assert run.returncode == 1
+    assert "not overlay-managed" in run.stderr
+
+
 def test_a_broken_overlay_leaves_its_file_alone(env: dict[str, Path]) -> None:
     _seed(env)
     overlay = env["vault"] / ".wiki" / "custom" / GRAPH

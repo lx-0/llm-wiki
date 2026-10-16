@@ -1,0 +1,10 @@
+$ wiki seed --extract-custom .obsidian/graph.json
+exit: 1
+--- stdout ---
+wiki seed --extract-custom
+.obsidian/graph.json
+
+--- stderr ---
+✗ could not compute the drift of .obsidian/graph.json
+--- change ---
+(none)

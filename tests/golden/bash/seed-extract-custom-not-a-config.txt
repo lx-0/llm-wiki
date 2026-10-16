@@ -1,0 +1,8 @@
+$ wiki seed --extract-custom README.md
+exit: 1
+--- stdout ---
+wiki seed --extract-custom
+README.md
+
+--- stderr ---
+✗ 'README.md' is not overlay-managed (overlays are for the JSON configs under .obsidian/)
