@@ -12,6 +12,7 @@ import json
 import sys
 from pathlib import Path
 
+from core.console import say
 from core.state_store import StateStore
 from publish.corpus import (
     DEFAULT_ROOTS,
@@ -112,12 +113,10 @@ def main(argv: list[str] | None = None) -> int:
         from publish.oauth import DEFAULT_TOKEN_PATH, mint_interactive
 
         if not CONFIG.publish.endpoint:
-            print(
-                "set publish.endpoint first (wiki config set publish.endpoint …)", file=sys.stderr
-            )
+            say("set publish.endpoint first (wiki config set publish.endpoint …)", file=sys.stderr)
             return 1
         mint_interactive(CONFIG.publish.endpoint)
-        print(f"producer connected — tokens stored at {DEFAULT_TOKEN_PATH}")
+        say(f"producer connected — tokens stored at {DEFAULT_TOKEN_PATH}")
         return 0
 
     # Imported lazily so tests can drive the plan builder with explicit paths.
@@ -129,9 +128,9 @@ def main(argv: list[str] | None = None) -> int:
     # actionable error. Dry-run stays available either way.
     if not args.dry_run and not CONFIG.publish.enabled:
         if args.piggyback:
-            print("publish piggyback: publish.enabled=false — skipping", file=sys.stderr)
+            say("publish piggyback: publish.enabled=false — skipping", file=sys.stderr)
             return 0
-        print(
+        say(
             "publish is disabled — enable with `wiki config set publish.enabled true` "
             "(and set publish.endpoint)",
             file=sys.stderr,
@@ -153,12 +152,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.as_json:
             payload = to_json_payload(plan)
             payload["non_markdown_skipped"] = non_md
-            print(json.dumps(payload, ensure_ascii=False))
+            say(json.dumps(payload, ensure_ascii=False))
         else:
-            print(render_human(plan))
-            print(f"corpora: {breakdown}")
+            say(render_human(plan))
+            say(f"corpora: {breakdown}")
             if non_md:
-                print(
+                say(
                     f"note: {non_md} non-markdown files in the publish roots have "
                     "no contract channel (markdown-only) and are not published"
                 )
@@ -194,9 +193,9 @@ def main(argv: list[str] | None = None) -> int:
         report = execute_publish(client, store, plan, start, cfg.wiki_slug)
 
     if args.as_json:
-        print(json.dumps(report_json(report), ensure_ascii=False))
+        say(json.dumps(report_json(report), ensure_ascii=False))
     else:
-        print(render_report(report))
+        say(render_report(report))
     return 0
 
 

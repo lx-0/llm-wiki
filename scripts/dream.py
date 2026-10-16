@@ -68,6 +68,7 @@ from core.console import (
     C_RESET,
     C_YELLOW,
     ConsoleFormatter,
+    say,
     setup_console_logging,
 )
 from core.errors import swallow
@@ -1034,7 +1035,7 @@ def _run_web_research_standalone(ent: EntityRef, *, dry_run: bool) -> int:
     )
     if res.status == "ok":
         if dry_run and res.block:
-            print(res.block)
+            say(res.block)
         else:
             log.info("Wrote Public Profile block for %s", ent.slug)
         return 0
@@ -1142,8 +1143,8 @@ async def _cmd_entity(args: argparse.Namespace) -> int:
 
 def _print_candidates(rows: list[dict], limit: int) -> None:
     """The `list-candidates` table (the `--json` branch prints the rows raw)."""
-    print(f"{'Rank':<5} {'Weight':>8}  {'Prio':>6}  {'Age':>7}  {'Slug':<40} Source")
-    print("-" * 110)
+    say(f"{'Rank':<5} {'Weight':>8}  {'Prio':>6}  {'Age':>7}  {'Slug':<40} Source")
+    say("-" * 110)
     for i, r in enumerate(rows[:limit], 1):
         age = f"{r['age_days']}d" if r["age_days"] is not None else "never"
         flags = []
@@ -1154,11 +1155,11 @@ def _print_candidates(rows: list[dict], limit: int) -> None:
         if r["backoff_active"]:
             flags.append("backoff")
         flag = (" " + " ".join(flags)) if flags else ""
-        print(
+        say(
             f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}"
         )
     if len(rows) > limit:
-        print(f"... and {len(rows) - limit} more (raise --limit to see)")
+        say(f"... and {len(rows) - limit} more (raise --limit to see)")
 
 
 async def _async_main() -> int:
@@ -1206,7 +1207,7 @@ async def _async_main() -> int:
 
         rows = list_candidates(cooldown_days=args.cooldown_days)
         if args.json:
-            print(_json.dumps(rows, indent=2))
+            say(_json.dumps(rows, indent=2))
             return 0
         _print_candidates(rows, args.limit)
         return 0

@@ -26,7 +26,7 @@ from claude_agent_sdk import query
 
 from core.agent_spec import AgentSpec, SpecError, parse_spec
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import AGENT_SPECS_DIR, LOGS_DIR, STATE_DIR
 from core.sdk_helpers import SdkCallSpec, run_sdk_query
 from core.state_store import StateStore, store_for
@@ -164,20 +164,20 @@ def cmd_list() -> int:
             errors.append((path, exc))
 
     if not specs and not errors:
-        print("(no agent tasks defined yet — drop prompts/agents/<id>.md files to add them)")
+        say("(no agent tasks defined yet — drop prompts/agents/<id>.md files to add them)")
         return 0
 
     width = max((len(s.id) for s in specs), default=20)
     for s in specs:
         btn = "✓" if s.button else " "
         last = _last_run_for(s.id) or "—"
-        print(f"  {s.id:<{width}}  {btn} {s.title}  (last_run={last})")
+        say(f"  {s.id:<{width}}  {btn} {s.title}  (last_run={last})")
 
     if errors:
-        print()
-        print("Specs that failed to parse:")
+        say()
+        say("Specs that failed to parse:")
         for path, exc in errors:
-            print(f"  ✗ {path.name}: {exc}")
+            say(f"  ✗ {path.name}: {exc}")
         return 1
     return 0
 

@@ -40,6 +40,7 @@ from core.console import (
     ConsoleFormatter,
     is_tty,
     read_key,
+    say,
     setup_console_logging,
 )
 from core.contracts import StatusJSON, SuggestionJSON
@@ -161,7 +162,7 @@ def render_status_line(status: StatusJSON) -> str:
 def dispatch_subprocess(args: list[str]) -> int:
     """Run `wiki <args>` with inherited stdio so the operator sees output."""
     if not WIKI_BIN.exists():
-        print(f"wiki binary not found at {WIKI_BIN}", file=sys.stderr)
+        say(f"wiki binary not found at {WIKI_BIN}", file=sys.stderr)
         return 1
     return subprocess.run([str(WIKI_BIN), *args], check=False).returncode
 
@@ -186,7 +187,7 @@ def render_dispatch(dispatch: object, arg_prompt: Callable[[str], str | None]) -
             name = dispatch[1]
             _SPECIAL_HANDLERS[name](arg_prompt)
             return
-    print(f"unknown dispatch spec: {dispatch!r}", file=sys.stderr)
+    say(f"unknown dispatch spec: {dispatch!r}", file=sys.stderr)
 
 
 def _handle_query(arg_prompt: Callable[[str], str | None]) -> None:
@@ -595,10 +596,10 @@ def _run_home_picker(state: HomeState) -> None:
 def _open_category(letter: str) -> None:
     group, entries = CATEGORIES[letter]
     pt = _import_pt()
-    print(f"\n  ▸ {_category_title(group)}\n")
+    say(f"\n  ▸ {_category_title(group)}\n")
     for i, (_eid, item_label, desc, _disp) in enumerate(entries, start=1):
-        print(f"    {i:>2}) {item_label:<32} {desc}")
-    print()
+        say(f"    {i:>2}) {item_label:<32} {desc}")
+    say()
     try:
         pick = pt.prompt(f"Pick (1-{len(entries)}, Enter to cancel): ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -606,7 +607,7 @@ def _open_category(letter: str) -> None:
     if not pick:
         return
     if not pick.isdigit() or not (1 <= int(pick) <= len(entries)):
-        print(f"  invalid: {pick!r}")
+        say(f"  invalid: {pick!r}")
         return
     _eid, _label, _desc, dispatch = entries[int(pick) - 1]
     render_dispatch(dispatch, _pt_ask)
@@ -616,23 +617,23 @@ def _fuzzy_filter(query: str) -> None:
     """`/foo` typed at home — substring-match against the catalog."""
     q = query.lower().strip()
     if not q:
-        print("  (empty query)")
+        say("  (empty query)")
         return
     matches = [
         (id_, label, dispatch) for id_, label, dispatch in _flatten_for_fuzzy() if q in id_.lower()
     ]
     if not matches:
-        print(f"  no command matches '/{query}'")
+        say(f"  no command matches '/{query}'")
         return
     if len(matches) == 1:
         id_, label, dispatch = matches[0]
-        print(f"  one match: {id_} — {label}")
+        say(f"  one match: {id_} — {label}")
         render_dispatch(dispatch, _pt_ask)
         return
-    print(f"\n  Matches for /{query}:\n")
+    say(f"\n  Matches for /{query}:\n")
     for i, (id_, label, _disp) in enumerate(matches, start=1):
-        print(f"    {i:>2}) {id_:<22}  {label}")
-    print()
+        say(f"    {i:>2}) {id_:<22}  {label}")
+    say()
     pt = _import_pt()
     try:
         pick = pt.prompt(f"Pick (1-{len(matches)}, Enter to cancel): ").strip()
@@ -641,7 +642,7 @@ def _fuzzy_filter(query: str) -> None:
     if not pick:
         return
     if not pick.isdigit() or not (1 <= int(pick) <= len(matches)):
-        print(f"  invalid: {pick!r}")
+        say(f"  invalid: {pick!r}")
         return
     _id, _label, dispatch = matches[int(pick) - 1]
     render_dispatch(dispatch, _pt_ask)
@@ -657,7 +658,7 @@ def main() -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         # Non-TTY callers get `wiki help`, rendered here rather than spawned through the
         # entry again (bash → python → python; M034-S06-T01). Same posture as bare `wiki`.
-        print(render_help())
+        say(render_help())
         return 0
 
     state = HomeState()
@@ -685,21 +686,21 @@ def main() -> int:
                 idx = state.selected[1]
                 actions = state.actions()
                 if 0 <= idx < len(actions):
-                    print()
+                    say()
                     dispatch_subprocess(actions[idx]["dispatch_args"])
                     _pause()
             elif tag == "quick":
                 key = state.selected[1]
                 spec = next(d for k, _l, _d, d in QUICK_ACTIONS if k == key)
-                print()
+                say()
                 render_dispatch(spec, _pt_ask)
                 _pause()
             elif tag == "category":
                 _open_category(state.selected[1])
                 _pause()
             elif tag == "help":
-                print()
-                print(render_help())
+                say()
+                say(render_help())
                 _pause()
             elif tag == "filter":
                 pt = _import_pt()

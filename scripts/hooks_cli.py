@@ -21,7 +21,18 @@ from pathlib import Path
 from cli_help import H_HOOKS, print_help
 from core import agents
 from core.backup import backup
-from core.console import banner, confirm, fail, info, ok, print_error, select_many, select_one, warn
+from core.console import (
+    banner,
+    confirm,
+    fail,
+    info,
+    ok,
+    print_error,
+    say,
+    select_many,
+    select_one,
+    warn,
+)
 from core.paths import ROOT_DIR, WIKI_DIR
 
 # Scope picker labels → the scopes, in the bash's order: "both" did project first.
@@ -81,12 +92,12 @@ def _cell(name: str, scope: str) -> str:
 
 
 def status_table() -> None:
-    print(f"{'AGENT':<10} {'USER':<22} {'PROJECT':<22} PROJECT CONFIG")
-    print("─" * 78)
+    say(f"{'AGENT':<10} {'USER':<22} {'PROJECT':<22} PROJECT CONFIG")
+    say("─" * 78)
     for spec in agents.AGENTS:
         user = _pad(_cell(spec.name, "user"), 30)
         project = _pad(_cell(spec.name, "project"), 30)
-        print(f"{spec.name:<10} {user} {project} {_config(spec.name, 'project')}")
+        say(f"{spec.name:<10} {user} {project} {_config(spec.name, 'project')}")
 
 
 def _pick_scopes(fd: int) -> tuple[str, ...]:
@@ -175,7 +186,7 @@ def _run(chosen: list[str], scopes: tuple[str, ...], one, what: str) -> int:
         for scope in scopes:
             total += 1
             failed += not one(name, scope)
-    print()
+    say()
     if failed:
         fail(f"{failed} of {total} {what} failed — see above.")
         return 1
@@ -188,7 +199,7 @@ def install(*, fd: int = 0) -> int:
         "Adds session hooks to one or more AI agent configs. Backups + idempotent.",
     )
     status_table()
-    print()
+    say()
     names = [spec.name for spec in agents.AGENTS]
     defaults = [n for n in names if _present(n, "user") or _present(n, "project")] or ["claude"]
     chosen = select_many("Select agents to install hooks for", names, defaults, fd=fd)
@@ -196,16 +207,16 @@ def install(*, fd: int = 0) -> int:
         warn("No agents selected.")
         return 0
     scopes = _pick_scopes(fd)
-    print()
+    say()
     info("Will install hooks:")
     for name in chosen:
         for scope in scopes:
-            print(f"  - {name} @ {scope} → {_config(name, scope)}")
-    print()
+            say(f"  - {name} @ {scope} → {_config(name, scope)}")
+    say()
     if not confirm("Proceed?", True, fd=fd, out=sys.stdout):
         warn("Aborted.")
         return 0
-    print()
+    say()
     code = _run(chosen, scopes, _install_one, "hook installs")
     if code == 0:
         ok("Done. Restart agent CLIs to pick up the new hooks.")
@@ -217,7 +228,7 @@ def uninstall(*, fd: int = 0) -> int:
         "wiki hooks — uninstall", "Removes wiki-managed hook entries; preserves user's other hooks."
     )
     status_table()
-    print()
+    say()
     names = [spec.name for spec in agents.AGENTS]
     defaults = [n for n in names if _may_hold_ours(n, "user") or _may_hold_ours(n, "project")]
     if not defaults:
@@ -228,11 +239,11 @@ def uninstall(*, fd: int = 0) -> int:
         warn("No agents selected.")
         return 0
     scopes = _pick_scopes(fd)
-    print()
+    say()
     if not confirm("Remove wiki hooks from selected configs?", True, fd=fd, out=sys.stdout):
         warn("Aborted.")
         return 0
-    print()
+    say()
     code = _run(chosen, scopes, _uninstall_one, "hook removals")
     if code == 0:
         ok("Done.")

@@ -12,7 +12,7 @@ import json
 import sys
 from typing import NoReturn
 
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import LOGS_DIR
 
 
@@ -34,16 +34,16 @@ def _list(as_json: bool = False) -> NoReturn:
                 for c in all_collectors()
             ]
         }
-        print(json.dumps(payload, indent=2))
+        say(json.dumps(payload, indent=2))
         sys.exit(0)
 
-    print(f"{'NAME':<20} {'CONFIGURED':<18} {'OUTPUT':<28} PIGGYBACK")
-    print("─" * 90)
+    say(f"{'NAME':<20} {'CONFIGURED':<18} {'OUTPUT':<28} PIGGYBACK")
+    say("─" * 90)
     for c in all_collectors():
         spec = c.SPEC
         cfg = "✓" if c.is_configured() else "✗"
         pb = "auto" if spec.piggyback_default else "manual-only"
-        print(f"{spec.name:<20} {cfg:<18} {spec.output_subfolder:<28} {pb}")
+        say(f"{spec.name:<20} {cfg:<18} {spec.output_subfolder:<28} {pb}")
     sys.exit(0)
 
 
@@ -52,12 +52,12 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
 
     collector = get_collector(name)
     if collector is None:
-        print(f"error: no collector registered with name {name!r}", file=sys.stderr)
-        print("       try: wiki collect --list", file=sys.stderr)
+        say(f"error: no collector registered with name {name!r}", file=sys.stderr)
+        say("       try: wiki collect --list", file=sys.stderr)
         sys.exit(1)
 
     if not collector.is_configured():
-        print(f"warning: collector {name!r} is not configured — running anyway")
+        say(f"warning: collector {name!r} is not configured — running anyway")
 
     # `--account` restricts the run to one account id. It only applies to
     # account substrates (SPEC.supports_account_loop) — the field's real
@@ -66,11 +66,11 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
     # silently ignored.
     if account is not None:
         if not collector.SPEC.supports_account_loop:
-            print(
+            say(
                 f"error: collector {name!r} does not support --account (not an account substrate)",
                 file=sys.stderr,
             )
-            print(
+            say(
                 "       --account applies only to account substrates "
                 "(email, calendar, gmeet, jamie, health)",
                 file=sys.stderr,
@@ -79,16 +79,16 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
         result = collector.run(dry_run=dry_run, incremental=incremental, account=account)
     else:
         result = collector.run(dry_run=dry_run, incremental=incremental)
-    print(result.message)
-    print(f"  files written: {len(result.files_written)}")
-    print(f"  files skipped: {result.files_skipped}")
+    say(result.message)
+    say(f"  files written: {len(result.files_written)}")
+    say(f"  files skipped: {result.files_skipped}")
     if result.errors:
         # Surface scan failures loudly + exit non-zero — a piggyback run's
         # output is DEVNULL'd by flush.py, but the FileHandler keeps a trace
         # and the exit code lets any wrapper detect the failure.
-        print(f"  errors: {len(result.errors)}", file=sys.stderr)
+        say(f"  errors: {len(result.errors)}", file=sys.stderr)
         for err in result.errors:
-            print(f"    ✗ {err}", file=sys.stderr)
+            say(f"    ✗ {err}", file=sys.stderr)
         sys.exit(1)
     sys.exit(0)
 

@@ -40,7 +40,7 @@ from pathlib import Path
 from core import frontmatter
 from core.backup import backup
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import FACTS_DIR, KNOWLEDGE_DIR
 from core.utils import slugify, today_iso
 
@@ -172,14 +172,14 @@ def cmd_add(args: argparse.Namespace) -> int:
     _write_fact(path, fm, body)
     if status == "negation":
         _warn_broad_terms(list(args.term or []), KNOWLEDGE_DIR)
-    print(str(path))
+    say(str(path))
     return 0
 
 
 def cmd_list(args: argparse.Namespace) -> int:
     facts = _list_facts()
     if not facts:
-        print("(no hard facts yet)")
+        say("(no hard facts yet)")
         return 0
     for path in facts:
         fm, _ = frontmatter.parse(path.read_text(encoding="utf-8"))
@@ -191,7 +191,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         slug = path.stem
         src_hint = f" [{len(sources)} src]" if sources else " [0 src]"
         terms_hint = f" [{len(terms)} term(s)]" if terms else ""
-        print(f"{slug:40s} {status:14s} {trust:11s} {title}{src_hint}{terms_hint}")
+        say(f"{slug:40s} {status:14s} {trust:11s} {title}{src_hint}{terms_hint}")
     return 0
 
 
@@ -225,7 +225,7 @@ def cmd_path(args: argparse.Namespace) -> int:
     if not path.exists():
         log.error("no such fact: %s", slug)
         return 1
-    print(str(path))
+    say(str(path))
     return 0
 
 

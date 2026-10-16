@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 from core import frontmatter
+from core.console import say
 from core.paths import (
     WORKSPACE_INBOX_DIR,
     WORKSPACE_TASKS_DIR,
@@ -97,12 +98,12 @@ def _resolve(stem: str) -> Path | None:
     if len(cands) == 1:
         return cands[0]
     if len(cands) > 1:
-        print(
+        say(
             f"ambiguous '{stem}' — matches {len(cands)}: {[c.stem for c in cands][:5]}",
             file=sys.stderr,
         )
     else:
-        print(f"no inbox record matching '{stem}'", file=sys.stderr)
+        say(f"no inbox record matching '{stem}'", file=sys.stderr)
     return None
 
 
@@ -110,10 +111,10 @@ def _set_status(path: Path, status: str) -> int:
     text = path.read_text(encoding="utf-8")
     new, n = re.subn(r"^status:.*$", f"status: {status}", text, count=1, flags=re.M)
     if n == 0:
-        print(f"no status: line in {path.name}", file=sys.stderr)
+        say(f"no status: line in {path.name}", file=sys.stderr)
         return 1
     path.write_text(new, encoding="utf-8")
-    print(f"{path.stem} → status: {status}")
+    say(f"{path.stem} → status: {status}")
     return 0
 
 
@@ -153,7 +154,7 @@ def _accept(path: Path) -> int:
     (WORKSPACE_TASKS_DIR / f"{num}.md").write_text(text, encoding="utf-8")
     path.unlink()
     _append_todo(num, fm.get("summary") or path.stem)
-    print(f"{path.stem} → accepted: moved to tasks/{num}.md + listed in todo.md")
+    say(f"{path.stem} → accepted: moved to tasks/{num}.md + listed in todo.md")
     return 0
 
 
@@ -188,15 +189,15 @@ def _json_payload(show_all: bool) -> dict:
 
 def _list(show_all: bool, as_json: bool = False) -> int:
     if as_json:
-        print(json.dumps(_json_payload(show_all), indent=2))
+        say(json.dumps(_json_payload(show_all), indent=2))
         return 0
     recs = _records()
     if not recs:
-        print("workspace/inbox/ is empty — nothing to triage.")
+        say("workspace/inbox/ is empty — nothing to triage.")
         return 0
     shown = [(f, fm) for f, fm, _ in recs if show_all or fm.get("status") == "pending"]
     if not shown:
-        print("No pending records. (use --all to see accepted/dismissed/done)")
+        say("No pending records. (use --all to see accepted/dismissed/done)")
         return 0
     shown.sort(key=lambda x: (_ORDER.get(x[1].get("type", ""), 9), x[0].name))
     cur = None
@@ -204,16 +205,16 @@ def _list(show_all: bool, as_json: bool = False) -> int:
         t = fm.get("type", "?")
         if t != cur:
             cur = t
-            print(f"\n## {t.upper()}")
+            say(f"\n## {t.upper()}")
         st = fm.get("status", "?")
         flag = "" if st == "pending" else f" [{st}]"
         conf = fm.get("confidence", "?")
         date = _capture_date(fm.get("source", "")) or (fm.get("detected_at") or "")[:10] or "—"
         summ = fm.get("summary") or f.stem
-        print(f"  • {f.stem}")
-        print(f"      ({date} · {conf}{flag}) {summ}")
+        say(f"  • {f.stem}")
+        say(f"      ({date} · {conf}{flag}) {summ}")
     pend = sum(1 for _, fm, _ in recs if fm.get("status") == "pending")
-    print(f"\n{pend} pending · {len(recs)} total.  Act: wiki triage accept|dismiss <stem>")
+    say(f"\n{pend} pending · {len(recs)} total.  Act: wiki triage accept|dismiss <stem>")
     return 0
 
 

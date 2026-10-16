@@ -36,6 +36,7 @@ import sys
 from pathlib import Path
 
 from core import frontmatter
+from core.console import say
 from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 
 TYPE_TO_MOC = {
@@ -69,9 +70,9 @@ def _resolve_article(arg: str) -> Path:
     if not matches:
         sys.exit(f"article not found: {arg}")
     if len(matches) > 1:
-        print("multiple matches — pass a specific path:", file=sys.stderr)
+        say("multiple matches — pass a specific path:", file=sys.stderr)
         for m in matches:
-            print(f"  {m.relative_to(ROOT_DIR)}", file=sys.stderr)
+            say(f"  {m.relative_to(ROOT_DIR)}", file=sys.stderr)
         sys.exit(1)
     return matches[0].resolve()
 
@@ -102,10 +103,10 @@ def _existing_sections(moc_text: str) -> list[str]:
 def _pick_section(sections: list[str]) -> str:
     if not sections:
         return input("No sections yet. New section name: ").strip()
-    print("Existing sections:")
+    say("Existing sections:")
     for i, s in enumerate(sections, 1):
-        print(f"  [{i}] {s}")
-    print(f"  [{len(sections) + 1}] (new section)")
+        say(f"  [{i}] {s}")
+    say(f"  [{len(sections) + 1}] (new section)")
     raw = input("Pick (number or name): ").strip()
     if raw.isdigit():
         n = int(raw)
@@ -224,7 +225,7 @@ def main() -> None:
 
     moc_text = moc_path.read_text(encoding="utf-8")
     if f"[[{basename}]]" in moc_text or f"/{basename}]]" in moc_text:
-        print(f"already pinned: [[{basename}]] in MOCs/{moc_name}.md")
+        say(f"already pinned: [[{basename}]] in MOCs/{moc_name}.md")
         return
 
     summary = args.summary or _lookup_summary(basename)
@@ -239,9 +240,9 @@ def main() -> None:
 
     changed, msg = _insert_pin(moc_path, section, line)
     if changed:
-        print(f"✓ pinned [[{basename}]] → MOCs/{moc_name}.md  ({msg})")
+        say(f"✓ pinned [[{basename}]] → MOCs/{moc_name}.md  ({msg})")
     else:
-        print(f"no change: {msg}")
+        say(f"no change: {msg}")
 
 
 if __name__ == "__main__":

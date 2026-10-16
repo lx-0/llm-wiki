@@ -29,6 +29,7 @@ import logging
 import sys
 from pathlib import Path
 
+from core.console import say
 from core.paths import ROOT_DIR
 from reports._engine.lib.analyst import (
     PERSONA_CROSS_STUDY,
@@ -53,11 +54,11 @@ def cmd_pass1(args: argparse.Namespace, vault_root: Path) -> int:
     if args.study:
         studies = [s for s in studies if s.manifest.study_id == args.study]
         if not studies:
-            print(f"ERROR: study {args.study!r} not found", file=sys.stderr)
+            say(f"ERROR: study {args.study!r} not found", file=sys.stderr)
             return 2
 
     if not studies:
-        print(f"(no studies under {studies_root(vault_root)})")
+        say(f"(no studies under {studies_root(vault_root)})")
         return 0
 
     failures = 0
@@ -65,23 +66,23 @@ def cmd_pass1(args: argparse.Namespace, vault_root: Path) -> int:
     for study in studies:
         latest = latest_run_dir(study)
         if latest is None:
-            print(f"  {study.manifest.study_id}: no runs yet — skipping")
+            say(f"  {study.manifest.study_id}: no runs yet — skipping")
             continue
         analysis_path = latest / "_analysis.md"
         if analysis_path.is_file() and not args.rerun:
-            print(
+            say(
                 f"  {study.manifest.study_id}: _analysis.md already exists "
                 f"({analysis_path.relative_to(studies_root(vault_root).parent)}) — "
                 f"--rerun to overwrite, skipping"
             )
             pass1_paths.append(analysis_path)
             continue
-        print(
+        say(
             f"  {study.manifest.study_id}: Pass-1 analyst on run {latest.name} …",
             flush=True,
         )
         user_prompt = build_pass1_user_prompt(study, latest)
-        print(f"    prompt_chars={len(user_prompt):,}", flush=True)
+        say(f"    prompt_chars={len(user_prompt):,}", flush=True)
         try:
             result = run_analyst(
                 system_prompt_path=PERSONA_PER_STUDY,
@@ -90,21 +91,21 @@ def cmd_pass1(args: argparse.Namespace, vault_root: Path) -> int:
                 pass_label="per-study",
             )
         except AnalystError as exc:
-            print(f"    ! Pass-1 failed: {exc}", file=sys.stderr)
+            say(f"    ! Pass-1 failed: {exc}", file=sys.stderr)
             failures += 1
             continue
         path = persist_pass1(study, latest, result)
         pass1_paths.append(path)
-        print(
+        say(
             f"    → {path.relative_to(studies_root(vault_root).parent)}  "
             f"cost=${result.cost_usd:.4f}  elapsed={result.elapsed_ms / 1000:.1f}s",
             flush=True,
         )
 
     if failures:
-        print(f"\nPass-1: {failures}/{len(studies)} failed.", file=sys.stderr)
+        say(f"\nPass-1: {failures}/{len(studies)} failed.", file=sys.stderr)
         return 1
-    print(f"\n✓ Pass-1 done: {len(pass1_paths)} _analysis.md file(s).")
+    say(f"\n✓ Pass-1 done: {len(pass1_paths)} _analysis.md file(s).")
     return 0
 
 
@@ -118,7 +119,7 @@ def cmd_pass2(args: argparse.Namespace, vault_root: Path) -> int:
         summary = latest / "_summary.md"
         analysis = latest / "_analysis.md"
         if not summary.is_file() or not analysis.is_file():
-            print(
+            say(
                 f"  {study.manifest.study_id}: skipping — "
                 f"{'_summary' if not summary.is_file() else '_analysis'} missing "
                 f"(run Pass-1 first)"
@@ -127,16 +128,16 @@ def cmd_pass2(args: argparse.Namespace, vault_root: Path) -> int:
         studies_with.append((study, summary, analysis))
 
     if not studies_with:
-        print("(no studies with completed Pass-1 outputs — run `wiki analyze --all-studies` first)")
+        say("(no studies with completed Pass-1 outputs — run `wiki analyze --all-studies` first)")
         return 0
 
-    print(
+    say(
         f"  Pass-2 cross-study synthesist over "
         f"{len(studies_with)} stud{'y' if len(studies_with) == 1 else 'ies'} …",
         flush=True,
     )
     user_prompt = build_pass2_user_prompt(studies_with)
-    print(f"    prompt_chars={len(user_prompt):,}", flush=True)
+    say(f"    prompt_chars={len(user_prompt):,}", flush=True)
     try:
         result = run_analyst(
             system_prompt_path=PERSONA_CROSS_STUDY,
@@ -145,11 +146,11 @@ def cmd_pass2(args: argparse.Namespace, vault_root: Path) -> int:
             pass_label="cross-study",
         )
     except AnalystError as exc:
-        print(f"    ! Pass-2 failed: {exc}", file=sys.stderr)
+        say(f"    ! Pass-2 failed: {exc}", file=sys.stderr)
         return 1
 
     path = persist_pass2(result, len(studies_with), vault_root=vault_root)
-    print(
+    say(
         f"    → {path.relative_to(analyses_root(vault_root).parent)}  "
         f"cost=${result.cost_usd:.4f}  elapsed={result.elapsed_ms / 1000:.1f}s",
         flush=True,

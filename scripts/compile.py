@@ -40,6 +40,7 @@ from core.console import (
     C_RESET,
     C_YELLOW,
     ConsoleFormatter,
+    say,
     setup_console_logging,
 )
 from core.paths import (
@@ -512,7 +513,7 @@ def _emit_progress(enabled: bool, current: int, total: int) -> None:
     emit no structured lines."""
     if not enabled:
         return
-    print(f"PROGRESS {json.dumps({'current': current, 'total': total})}", flush=True)
+    say(f"PROGRESS {json.dumps({'current': current, 'total': total})}", flush=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -8,11 +8,12 @@ import sys
 
 import config_cli
 import hooks_cli
+from core.console import say
 
 
 def main() -> int:
     config_cli.status()
-    print()
+    say()
     hooks_cli.status_table()
     return 0
 

@@ -45,7 +45,7 @@ import yaml
 
 from core import backup as backups
 from core import frontmatter
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.links import relative_target, resolve_link, retarget_links
 
 log = logging.getLogger("dedup")
@@ -576,14 +576,14 @@ def merge_pages(
 
 def _print_candidates(cands: list[CandidatePair]) -> None:
     if not cands:
-        print("No duplicate candidates found.")
+        say("No duplicate candidates found.")
         return
-    print(f"Found {len(cands)} candidate pair(s):\n")
+    say(f"Found {len(cands)} candidate pair(s):\n")
     for i, c in enumerate(cands, 1):
-        print(f"[{i}] {c.confidence:.2f}  {c.a.kind}/")
-        print(f'      A: {c.a.slug:32s} "{c.a.title}"')
-        print(f'      B: {c.b.slug:32s} "{c.b.title}"')
-        print(f"      → {', '.join(c.reasons)}\n")
+        say(f"[{i}] {c.confidence:.2f}  {c.a.kind}/")
+        say(f'      A: {c.a.slug:32s} "{c.a.title}"')
+        say(f'      B: {c.b.slug:32s} "{c.b.title}"')
+        say(f"      → {', '.join(c.reasons)}\n")
 
 
 def _ask(prompt: str) -> str:
@@ -599,9 +599,9 @@ def _interactive_loop(
     merged = 0
     total = len(cands)
     for i, c in enumerate(cands, 1):
-        print(f"\n[{i}/{total}] potential duplicate ({c.confidence:.2f} · {', '.join(c.reasons)}):")
-        print(f'  A: {c.a.kind}/{c.a.slug}  "{c.a.title}"')
-        print(f'  B: {c.b.kind}/{c.b.slug}  "{c.b.title}"')
+        say(f"\n[{i}/{total}] potential duplicate ({c.confidence:.2f} · {', '.join(c.reasons)}):")
+        say(f'  A: {c.a.kind}/{c.a.slug}  "{c.a.title}"')
+        say(f'  B: {c.b.kind}/{c.b.slug}  "{c.b.title}"')
         ans = _ask("  → same entity? [y/N/skip/quit] ").lower()
         if ans in ("q", "quit"):
             break
@@ -630,18 +630,18 @@ def _interactive_loop(
         )
         _report_merge(res, keep, drop)
         merged += 1
-    print(f"\nDone. {merged} merge(s){' (dry-run, nothing written)' if dry_run else ''}.")
+    say(f"\nDone. {merged} merge(s){' (dry-run, nothing written)' if dry_run else ''}.")
     return 0
 
 
 def _report_merge(res: MergeResult, keep: EntityPage, drop: EntityPage) -> None:
     tag = "(dry-run) " if res.dry_run else ""
-    print(f"  {tag}✓ merged {drop.slug} → {keep.slug}")
-    print(f"      links rewritten in {len(res.links_rewritten)} file(s)")
+    say(f"  {tag}✓ merged {drop.slug} → {keep.slug}")
+    say(f"      links rewritten in {len(res.links_rewritten)} file(s)")
     if res.backup:
-        print(f"      B backed up → {res.backup.name}, deleted")
+        say(f"      B backed up → {res.backup.name}, deleted")
     if res.fact:
-        print(f"      hard fact → {res.fact.name}")
+        say(f"      hard fact → {res.fact.name}")
 
 
 def _resolve_entity_arg(arg: str, knowledge_dir: Path) -> EntityPage | None:
@@ -718,10 +718,10 @@ def main(argv: list[str] | None = None) -> int:
             log.error("refusing to merge a page into itself")
             return 1
         canonical = args.name or keep.title
-        print(f'merge {drop.kind}/{drop.slug} INTO {keep.kind}/{keep.slug} as "{canonical}"')
+        say(f'merge {drop.kind}/{drop.slug} INTO {keep.kind}/{keep.slug} as "{canonical}"')
         confirm = _ask(f"  → confirm? {'(dry-run) ' if args.dry_run else ''}[y/N] ").lower()
         if confirm not in ("y", "yes"):
-            print("aborted.")
+            say("aborted.")
             return 0
         res = merge_pages(
             keep,
@@ -741,12 +741,12 @@ def main(argv: list[str] | None = None) -> int:
         _print_candidates(cands)
         return 0
     if not cands:
-        print("No duplicate candidates found.")
+        say("No duplicate candidates found.")
         return 0
     if not sys.stdin.isatty():
         # Non-interactive caller (hook, pipe) — print, don't block on input.
         _print_candidates(cands)
-        print("(non-interactive: run `wiki dedup` in a terminal to merge)")
+        say("(non-interactive: run `wiki dedup` in a terminal to merge)")
         return 0
     return _interactive_loop(
         cands, knowledge_dir=KNOWLEDGE_DIR, vault=ROOT_DIR, dry_run=args.dry_run

@@ -13,19 +13,19 @@ import argparse
 import sys
 from typing import NoReturn
 
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import LOGS_DIR
 
 
 def _list() -> NoReturn:
     from preprocessors import all_preprocessors
 
-    print(f"{'NAME':<14} {'OUTPUT':<20} SOURCE-ARG")
-    print("─" * 60)
+    say(f"{'NAME':<14} {'OUTPUT':<20} SOURCE-ARG")
+    say("─" * 60)
     for p in all_preprocessors():
         spec = p.SPEC
         src = "required" if spec.takes_source else "(none — sweep)"
-        print(f"{spec.name:<14} {spec.output_subfolder:<20} {src}")
+        say(f"{spec.name:<14} {spec.output_subfolder:<20} {src}")
     sys.exit(0)
 
 
@@ -34,23 +34,23 @@ def _run_one(name: str, *, dry_run: bool, source: str | None) -> NoReturn:
 
     pre = get_preprocessor(name)
     if pre is None:
-        print(f"error: no preprocessor registered with name {name!r}", file=sys.stderr)
-        print("       try: wiki preprocess --list", file=sys.stderr)
+        say(f"error: no preprocessor registered with name {name!r}", file=sys.stderr)
+        say("       try: wiki preprocess --list", file=sys.stderr)
         sys.exit(1)
 
     if pre.SPEC.takes_source and not source:
-        print(f"error: preprocessor {name!r} needs a source (path or URL)", file=sys.stderr)
+        say(f"error: preprocessor {name!r} needs a source (path or URL)", file=sys.stderr)
         sys.exit(1)
 
     result = pre.run(dry_run=dry_run, source=source)
-    print(result.message)
-    print(f"  files written: {len(result.files_written)}")
+    say(result.message)
+    say(f"  files written: {len(result.files_written)}")
     if result.files_skipped:
-        print(f"  files skipped: {result.files_skipped}")
+        say(f"  files skipped: {result.files_skipped}")
     if result.errors:
-        print(f"  errors: {len(result.errors)}", file=sys.stderr)
+        say(f"  errors: {len(result.errors)}", file=sys.stderr)
         for err in result.errors:
-            print(f"    ✗ {err}", file=sys.stderr)
+            say(f"    ✗ {err}", file=sys.stderr)
         sys.exit(1)
     sys.exit(0)
 

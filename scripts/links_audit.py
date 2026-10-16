@@ -29,6 +29,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.console import say
 from core.links import (
     _strip_frontmatter_and_fences,
     canonical_slug,
@@ -156,45 +157,43 @@ def apply_fixes(knowledge_dir: Path, vault: Path, corrections: dict[str, str]) -
 
 def _print_report(audit: Audit) -> None:
     n_dangling = sum(d.count for d in audit.dangling)
-    print(
+    say(
         f"Broken links: {len(audit.embeds)} media · {len(audit.literals)} placeholders · "
         f"{len(audit.dangling)} dangling refs ({n_dangling} occurrences)\n"
     )
 
     if audit.fixable:
-        print(f"── Fixable dangling refs ({len(audit.fixable)}) — `wiki links --fix` to apply ──")
+        say(f"── Fixable dangling refs ({len(audit.fixable)}) — `wiki links --fix` to apply ──")
         for d in sorted(audit.fixable, key=lambda x: (x.tier != "bucket", -x.count)):
             mark = "≡" if d.tier == "bucket" else "~"
-            print(
+            say(
                 f"  {d.count:3d}x  [[{d.target}]]  {mark}→  [[{d.suggestion}]]   (e.g. {d.example})"
             )
-        print()
+        say()
 
     missing = [d for d in audit.dangling if not d.suggestion]
     if missing:
-        print(
-            f"── Missing articles ({len(missing)}) — create via compile/dream, or drop the link ──"
-        )
+        say(f"── Missing articles ({len(missing)}) — create via compile/dream, or drop the link ──")
         for d in sorted(missing, key=lambda x: -x.count):
-            print(f"  {d.count:3d}x  [[{d.target}]]   (e.g. {d.example})")
-        print()
+            say(f"  {d.count:3d}x  [[{d.target}]]   (e.g. {d.example})")
+        say()
 
     if audit.embeds:
-        print(f"── Media embeds ({len(audit.embeds)}) — asset missing? check _attachments/ ──")
+        say(f"── Media embeds ({len(audit.embeds)}) — asset missing? check _attachments/ ──")
         for t, n, ex in audit.embeds:
-            print(f"  {n:3d}x  ![[{t}]]   (e.g. {ex})")
-        print()
+            say(f"  {n:3d}x  ![[{t}]]   (e.g. {ex})")
+        say()
 
     if audit.literals:
-        print(f"── Doc placeholders ({len(audit.literals)}) — examples, leave them ──")
+        say(f"── Doc placeholders ({len(audit.literals)}) — examples, leave them ──")
         for t, n, ex in audit.literals:
-            print(f"  {n:3d}x  [[{t}]]   (e.g. {ex})")
+            say(f"  {n:3d}x  [[{t}]]   (e.g. {ex})")
 
 
 def _run_fixer(knowledge_dir: Path, vault: Path, audit: Audit, assume_yes: bool) -> None:
     fixable = sorted(audit.fixable, key=lambda x: (x.tier != "bucket", -x.count))
     if not fixable:
-        print("No high-confidence fixable links. Nothing to do.")
+        say("No high-confidence fixable links. Nothing to do.")
         return
 
     # `--yes` is non-interactive but only auto-approves the near-certain
@@ -204,21 +203,21 @@ def _run_fixer(knowledge_dir: Path, vault: Path, audit: Audit, assume_yes: bool)
         approved = {d.target: d.suggestion for d in fixable if d.tier == "bucket"}
         skipped = [d for d in fixable if d.tier != "bucket"]
         if not approved:
-            print("No bucket-tier corrections to auto-apply. Run interactively for fuzzy matches.")
+            say("No bucket-tier corrections to auto-apply. Run interactively for fuzzy matches.")
             return
         stats = apply_fixes(knowledge_dir, vault, approved)
-        print(
+        say(
             f"Applied {len(approved)} bucket-tier correction(s): {stats['links']} link(s) "
             f"rewritten across {stats['files']} file(s)."
         )
         if skipped:
-            print(
+            say(
                 f"Skipped {len(skipped)} fuzzy match(es) — run `wiki links --fix` interactively to review."
             )
         return
 
     if not sys.stdin.isatty():
-        print(
+        say(
             "--fix needs a TTY for per-item approval (or pass --yes for bucket-tier only). Aborting.",
             file=sys.stderr,
         )
@@ -226,7 +225,7 @@ def _run_fixer(knowledge_dir: Path, vault: Path, audit: Audit, assume_yes: bool)
 
     approved: dict[str, str] = {}
     apply_all = False
-    print(
+    say(
         f"{len(fixable)} fixable links. [y]es / [n]o / [a]ll / [q]uit\n"
         "  ≡ = exact basename, different bucket (near-certain)   ~ = close string match\n"
     )
@@ -249,10 +248,10 @@ def _run_fixer(knowledge_dir: Path, vault: Path, audit: Audit, assume_yes: bool)
             approved[d.target] = d.suggestion
 
     if not approved:
-        print("\nNothing approved.")
+        say("\nNothing approved.")
         return
     stats = apply_fixes(knowledge_dir, vault, approved)
-    print(
+    say(
         f"\nApplied {len(approved)} correction(s): {stats['links']} link(s) rewritten "
         f"across {stats['files']} file(s)."
     )
@@ -271,7 +270,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if not KNOWLEDGE_DIR.is_dir():
-        print(f"no knowledge/ under {ROOT_DIR}", file=sys.stderr)
+        say(f"no knowledge/ under {ROOT_DIR}", file=sys.stderr)
         return 2
 
     audit = build_audit(KNOWLEDGE_DIR, ROOT_DIR)

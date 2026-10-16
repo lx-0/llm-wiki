@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-from core.console import info, ok, print_error, warn
+from core.console import info, ok, print_error, say, warn
 from core.paths import WIKI_DIR
 
 TARGET = WIKI_DIR / "wiki"
@@ -31,10 +31,10 @@ def _report_path(bin_dir: Path) -> None:
         ok(f"{bin_dir} is on PATH — typing `wiki` from any cwd will work")
         return
     warn(f"{bin_dir} is NOT on PATH")
-    print()
+    say()
     info("Add this line to your shell rc (~/.zshrc on macOS default):")
     bold, reset = ("\033[1m", "\033[0m") if sys.stdout.isatty() else ("", "")
-    print(f"  {bold}{RC_LINE}{reset}")
+    say(f"  {bold}{RC_LINE}{reset}")
     info("Then reload: `source ~/.zshrc` (or open a new terminal).")
 
 

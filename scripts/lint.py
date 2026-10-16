@@ -35,7 +35,7 @@ from collections.abc import Callable
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import REPORTS_DIR
 from core.state_store import update_state
 from core.utils import now_iso, read_all_wiki_content, today_iso
@@ -336,10 +336,10 @@ async def main() -> None:
     errors = sum(1 for i in all_issues if i.severity == "error")
     warnings = sum(1 for i in all_issues if i.severity == "warning")
     suggestions = sum(1 for i in all_issues if i.severity == "suggestion")
-    print(f"\nResults: {errors} errors, {warnings} warnings, {suggestions} suggestions")
+    say(f"\nResults: {errors} errors, {warnings} warnings, {suggestions} suggestions")
 
     if errors > 0:
-        print("\nErrors found — knowledge base needs attention!")
+        say("\nErrors found — knowledge base needs attention!")
     sys.exit(_lint_exit_code(errors, args.structural_only))
 
 

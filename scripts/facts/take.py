@@ -37,7 +37,7 @@ from pathlib import Path
 
 from core import frontmatter
 from core.backup import backup
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import TAKES_DIR
 from core.utils import slugify, today_iso
 
@@ -201,7 +201,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     if status == "duplicate":
         log.info("take already recorded (no-op): %s", path)
         return 0
-    print(str(path))
+    say(str(path))
     return 0
 
 
@@ -214,7 +214,7 @@ def _list_take_files() -> list[Path]:
 def cmd_list(args: argparse.Namespace) -> int:
     files = _list_take_files()
     if not files:
-        print("(no takes recorded yet)")
+        say("(no takes recorded yet)")
         return 0
     for path in files:
         fm, body = _read_frontmatter(path)
@@ -222,7 +222,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         slug = path.stem
         title = fm.get("title", f"Takes — {slug}")
         last = fm.get("last_updated", "?")
-        print(f"{slug:30s} {len(takes):>3d} take(s)  updated:{last}  {title}")
+        say(f"{slug:30s} {len(takes):>3d} take(s)  updated:{last}  {title}")
     return 0
 
 
@@ -235,12 +235,12 @@ def cmd_show(args: argparse.Namespace) -> int:
     fm, body = _read_frontmatter(path)
     takes = _parse_take_lines(body)
     title = fm.get("title", f"Takes — {slug}")
-    print(f"# {title} ({len(takes)} take(s))\n")
+    say(f"# {title} ({len(takes)} take(s))\n")
     if not takes:
-        print("(no take lines parsed — file may be empty or malformed)")
+        say("(no take lines parsed — file may be empty or malformed)")
         return 0
     for i, t in enumerate(takes, start=1):
-        print(f"{i:>3d}. {t['raw']}")
+        say(f"{i:>3d}. {t['raw']}")
     return 0
 
 
@@ -288,7 +288,7 @@ def cmd_path(args: argparse.Namespace) -> int:
     if not path.exists():
         log.error("no takes for holder %r", slug)
         return 1
-    print(str(path))
+    say(str(path))
     return 0
 
 

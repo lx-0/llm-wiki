@@ -23,7 +23,7 @@ import httpx
 
 from cli_help import H_CONFIG, print_help
 from core import config as core_config
-from core.console import ask, confirm, print_error, read_line, select_one
+from core.console import ask, confirm, print_error, read_line, say, select_one
 from core.console import banner as _banner
 from core.console import info as _info
 from core.console import ok as _ok
@@ -92,10 +92,10 @@ def _ollama_reachable(url: str) -> bool:
 
 def status() -> int:
     _banner("wiki config — status")
-    print(f"{'config.yaml':<40} {core_config.CONFIG_FILE}")
+    say(f"{'config.yaml':<40} {core_config.CONFIG_FILE}")
     for label, key in STATUS_KEYS:
-        print(f"{label:<40} {_value(key)}")
-    print()
+        say(f"{label:<40} {_value(key)}")
+    say()
     url = _value("models.ollama_url")
     if _ollama_reachable(url):
         _ok("Ollama reachable")
@@ -110,10 +110,10 @@ def _edit_one(section: str, fd: int) -> None:
     if not section_keys:
         _warn(f"No keys in {section}.")
         return
-    print()
-    print(f"{_DIM}Current values in {section}:{_RESET}")
+    say()
+    say(f"{_DIM}Current values in {section}:{_RESET}")
     for i, key in enumerate(section_keys, 1):
-        print(f"  {i}) {key:<50} = {_value(key)}")
+        say(f"  {i}) {key:<50} = {_value(key)}")
     _prompt(f"Pick a key to edit {_DIM}(number, or 'b' to go back){_RESET}: ")
     pick = read_line(fd) or ""
     if pick in ("b", ""):
@@ -126,7 +126,7 @@ def _edit_one(section: str, fd: int) -> None:
         return
     key = section_keys[int(pick) - 1]
     current = _value(key)
-    print()
+    say()
     _prompt(f"Set {key} {_DIM}[current: {current}]{_RESET}: ")
     new = read_line(fd) or ""
     if not new:
@@ -140,13 +140,13 @@ def edit(*, fd: int = 0) -> int:
     """Bare `wiki config`: pick a section, then a key, then its new value; Enter skips."""
     _banner("wiki config — edit", "Pick a section, then a key. Enter on a key skips it.")
     while True:
-        print()
+        say()
         sys.stdout.flush()
         section = select_one("Section", SECTIONS, default=len(SECTIONS), fd=fd)
         if section == "exit":
             break
         _edit_one(section, fd)
-    print()
+    say()
     _ok("Done.")
     return 0
 
@@ -160,7 +160,7 @@ _HOUR = re.compile(r"[0-9]|1[0-9]|2[0-3]")
 def _complain(message: str) -> None:
     """A validator's complaint, on stderr beside the prompt it answers. In the bash it went
     to stdout inside `$(ask …)`, which captured it into the answer (fixed in 0.7.10)."""
-    print(f"{_YELLOW}! {message}{_RESET}", file=sys.stderr)
+    say(f"{_YELLOW}! {message}{_RESET}", file=sys.stderr)
 
 
 def _valid_url(value: str) -> bool:
@@ -214,7 +214,7 @@ def _ask_model_and_hour(fd: int) -> None:
     model = select_one("Pick", MODELS, default=default, fd=fd)
     if model != current_model:
         _set("models.compile_model", model)
-    print()
+    say()
     current_hour = _value("scheduling.compile_after_hour")
     hour = _ask("Auto-compile starts at hour (0-23, local time)", current_hour, _valid_hour, fd)
     if hour != current_hour:
@@ -224,11 +224,11 @@ def _ask_model_and_hour(fd: int) -> None:
 def wizard(*, fd: int = 0) -> int:
     """The six questions worth asking at first run; Enter keeps the current value."""
     _banner("wiki config — setup wizard", "6 questions. Skip with Enter to keep the current value.")
-    print()
+    say()
     ollama_ok = _ask_ollama(fd)
-    print()
+    say()
     _ask_model_and_hour(fd)
-    print()
+    say()
     _info(
         "Procmail execution lets suggestions/cli.py call a webmail-procmail provider API to "
         "apply mail rules server-side."
@@ -239,17 +239,17 @@ def wizard(*, fd: int = 0) -> int:
     )
     procmail_on = _value("features.procmail_execution") == "True"
     _switch("features.procmail_execution", _yes("Enable procmail execution?", procmail_on, fd))
-    print()
+    say()
     local = _yes("Enable local-LLM features (curiosity loop + screenshot OCR)?", ollama_ok, fd)
     _switch("features.curiosity_loop", local)
     _switch("features.vision_screenshots", local)
-    print()
+    say()
     _info("Global skill install links the 'use-llm-wiki' skill into ~/.claude/skills/")
     _info("so an agent working in *any* project can discover and query this wiki.")
     global_on = _value("skills.global_install") == "True"
     question = "Make this wiki's use-llm-wiki skill globally available?"
     _switch("skills.global_install", _yes(question, global_on, fd))
-    print()
+    say()
     _ok(f"Wizard complete. Config written to {core_config.CONFIG_FILE}.")
     return 0
 

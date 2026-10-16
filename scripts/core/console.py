@@ -73,6 +73,19 @@ def print_error(message: str) -> None:
 # so a piped or captured run gets plain text.
 
 
+def say(
+    *values: object,
+    sep: str = " ",
+    end: str = "\n",
+    file: TextIO | None = None,
+    flush: bool = False,
+) -> None:
+    """A command's plain output — the one path command modules write through (M034-S06-T02,
+    `tests/test_output_seam.py`). The contract is `print`'s: stdout unless ``file`` names
+    another stream, judged at call time. The status lines below are its styled siblings."""
+    print(*values, sep=sep, end=end, file=sys.stdout if file is None else file, flush=flush)
+
+
 def _styled(code: str, text: str) -> str:
     return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
 

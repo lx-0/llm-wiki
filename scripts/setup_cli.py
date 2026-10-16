@@ -14,13 +14,13 @@ import sys
 
 import config_cli
 import hooks_cli
-from core.console import confirm, info
+from core.console import confirm, info, say
 
 
 def setup(*, fd: int = 0) -> int:
     """The wizard, then "install hooks?"; the hooks installer's exit code is setup's."""
     config_cli.wizard(fd=fd)
-    print()
+    say()
     sys.stdout.flush()
     if confirm("Now install hooks into agent configs?", default=True, fd=fd):
         return hooks_cli.install(fd=fd)

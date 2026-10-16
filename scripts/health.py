@@ -28,6 +28,8 @@ import re
 import sys
 from pathlib import Path
 
+from core.console import say
+
 # ---------- ANSI ----------
 RST = "\033[0m"
 BOLD = "\033[1m"
@@ -394,13 +396,13 @@ def main() -> int:
 
     vault = args.vault.resolve()
     if not (vault / "knowledge").is_dir() and not (vault / ".wiki").is_dir():
-        print(
+        say(
             f"error: {vault} doesn't look like a wiki vault (no knowledge/ or .wiki/)",
             file=sys.stderr,
         )
         return 1
 
-    print(render(vault))
+    say(render(vault))
     return 0
 
 

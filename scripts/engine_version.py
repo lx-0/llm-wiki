@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from core.console import say
 from core.paths import WIKI_DIR
 
 _YELLOW, _RESET = ("\033[33m", "\033[0m") if sys.stdout.isatty() else ("", "")
@@ -44,7 +45,7 @@ def report(wiki_dir: Path) -> list[str]:
 
 def main() -> int:
     for line in report(WIKI_DIR):
-        print(line)
+        say(line)
     return 0
 
 

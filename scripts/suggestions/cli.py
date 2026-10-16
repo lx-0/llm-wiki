@@ -26,6 +26,7 @@ import yaml
 from adapters.mailbox import resolve_filter
 from core import frontmatter
 from core.config import CONFIG, TIMEZONE
+from core.console import say
 from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
 from domain.mail import FilterAction, FilterCondition, FilterRule
 from suggestions import suggestion_files as list_suggestion_files
@@ -61,7 +62,7 @@ def _resolve(name_or_path: str, known: list[Path]) -> Path | None:
     for f in known:
         if name_or_path in f.name:
             return f
-    print(f"Not found: {name_or_path}")
+    say(f"Not found: {name_or_path}")
     return None
 
 
@@ -77,7 +78,7 @@ def describe_action(i: int, action: dict) -> None:
         status, "?"
     )
 
-    print(f"  Action {i} [{status_icon} {status}]: {action_type} (account: {account})")
+    say(f"  Action {i} [{status_icon} {status}]: {action_type} (account: {account})")
 
     if action_type == "create-rule":
         rule = action.get("rule", {})
@@ -86,28 +87,28 @@ def describe_action(i: int, action: dict) -> None:
         action_label = rule.get("action", "Move to folder")
         account_cfg = (CONFIG.personal.accounts or {}).get(account, {})
         filter_kind = (account_cfg.get("filter") or {}).get("kind", "<unset>")
-        print(f"    Account: {account}  Filter kind: {filter_kind}")
-        print(f"    Rule:     {rule.get('name', '?')}")
-        print(f"    Condition: {condition}")
-        print(f"    Action:   {action_label} → {folder}")
+        say(f"    Account: {account}  Filter kind: {filter_kind}")
+        say(f"    Rule:     {rule.get('name', '?')}")
+        say(f"    Condition: {condition}")
+        say(f"    Action:   {action_label} → {folder}")
 
     elif action_type == "imap-move":
-        print(f"    Search: {action.get('search', [])}")
-        print(
+        say(f"    Search: {action.get('search', [])}")
+        say(
             f"    From: {action.get('source_folder', 'INBOX')} → To: {action.get('target_folder', '?')}"
         )
 
     elif action_type == "imap-tag":
-        print(f"    Search: {action.get('search', [])}")
-        print(f"    Folder: {action.get('folder', 'INBOX')}")
-        print(f"    Tag: {action.get('tag', '?')}")
+        say(f"    Search: {action.get('search', [])}")
+        say(f"    Folder: {action.get('folder', 'INBOX')}")
+        say(f"    Tag: {action.get('tag', '?')}")
 
     elif action_type == "imap-set-flags":
-        print(f"    Search: {action.get('search', [])}")
-        print(f"    Folder: {action.get('folder', 'INBOX')}")
-        print(f"    Flags: {action.get('flags', [])}")
+        say(f"    Search: {action.get('search', [])}")
+        say(f"    Folder: {action.get('folder', 'INBOX')}")
+        say(f"    Flags: {action.get('flags', [])}")
 
-    print()
+    say()
 
 
 # ── Action execution ────────────────────────────────────────────────
@@ -131,8 +132,8 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         account_with_id = {**account, "_id": account_id}
         filter_adapter = resolve_filter(account_with_id)
         if filter_adapter is None:
-            print(f"    SKIP: no filter resolved for account {account_id!r}")
-            print("    (configure account.filter.kind — see CONTEXT.md § Account.kind)")
+            say(f"    SKIP: no filter resolved for account {account_id!r}")
+            say("    (configure account.filter.kind — see CONTEXT.md § Account.kind)")
             return False
 
         # Translate the YAML rule to domain.mail.FilterRule.
@@ -141,7 +142,7 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         )
 
         result = filter_adapter.apply(rule, dry_run=dry_run)
-        print(f"    {result.message}")
+        say(f"    {result.message}")
         return result.success
 
     elif action_type == "imap-move":
@@ -175,7 +176,7 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         return "error" not in stats
 
     else:
-        print(f"    Unknown action type: {action_type}")
+        say(f"    Unknown action type: {action_type}")
         return False
 
 
@@ -269,10 +270,10 @@ def _cmd_list(suggestion_files: list[Path]) -> None:
     """── List ── every suggestion with its per-action status."""
     for f in suggestion_files:
         data = load_suggestion(f)
-        print(f"\n{'=' * 60}")
-        print(f"File: {f.name}")
-        print(f"Target: {data.get('target', '?')}")
-        print(f"Rationale: {data.get('rationale', '')}")
+        say(f"\n{'=' * 60}")
+        say(f"File: {f.name}")
+        say(f"Target: {data.get('target', '?')}")
+        say(f"Rationale: {data.get('rationale', '')}")
         for i, action in enumerate(data.get("actions", []), 1):
             describe_action(i, action)
 
@@ -280,8 +281,8 @@ def _cmd_list(suggestion_files: list[Path]) -> None:
 def _cmd_approve(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
     """── Approve action ── one pending action; exit 1 on a bad call."""
     if not args.action_num:
-        print("Usage: --approve <file> <action_number>")
-        print("Example: --approve test-billing 1")
+        say("Usage: --approve <file> <action_number>")
+        say("Example: --approve test-billing 1")
         sys.exit(1)
     path = _resolve(args.approve, suggestion_files)
     if not path:
@@ -290,22 +291,22 @@ def _cmd_approve(args: argparse.Namespace, suggestion_files: list[Path]) -> None
     actions = data.get("actions", [])
     idx = args.action_num - 1
     if idx < 0 or idx >= len(actions):
-        print(f"Action {args.action_num} not found (file has {len(actions)} actions)")
+        say(f"Action {args.action_num} not found (file has {len(actions)} actions)")
         sys.exit(1)
     if actions[idx].get("status", "pending") != "pending":
-        print(f"Action {args.action_num} is already '{actions[idx].get('status')}'")
+        say(f"Action {args.action_num} is already '{actions[idx].get('status')}'")
         sys.exit(1)
     actions[idx]["status"] = "approved"
     actions[idx]["reviewed"] = _stamp()
     save_suggestion(path, data)
-    print(f"Approved action {args.action_num} in {path.name}:")
+    say(f"Approved action {args.action_num} in {path.name}:")
     describe_action(args.action_num, actions[idx])
 
 
 def _cmd_reject(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
     """── Reject action ── one action, whatever its status; exit 1 on a bad call."""
     if not args.action_num:
-        print("Usage: --reject <file> <action_number>")
+        say("Usage: --reject <file> <action_number>")
         sys.exit(1)
     path = _resolve(args.reject, suggestion_files)
     if not path:
@@ -314,12 +315,12 @@ def _cmd_reject(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
     actions = data.get("actions", [])
     idx = args.action_num - 1
     if idx < 0 or idx >= len(actions):
-        print(f"Action {args.action_num} not found (file has {len(actions)} actions)")
+        say(f"Action {args.action_num} not found (file has {len(actions)} actions)")
         sys.exit(1)
     actions[idx]["status"] = "rejected"
     actions[idx]["reviewed"] = _stamp()
     save_suggestion(path, data)
-    print(f"Rejected action {args.action_num} in {path.name}")
+    say(f"Rejected action {args.action_num} in {path.name}")
 
 
 def _cmd_review(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
@@ -331,15 +332,15 @@ def _cmd_review(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
     data = load_suggestion(path)
     actions = data.get("actions", [])
 
-    print(f"\n{'=' * 60}")
-    print(f"Reviewing: {data.get('target', path.name)}")
-    print(f"Rationale: {data.get('rationale', '')}")
-    print(f"{'=' * 60}\n")
+    say(f"\n{'=' * 60}")
+    say(f"Reviewing: {data.get('target', path.name)}")
+    say(f"Rationale: {data.get('rationale', '')}")
+    say(f"{'=' * 60}\n")
 
     for i, action in enumerate(actions, 1):
         if action.get("status", "pending") != "pending":
             describe_action(i, action)
-            print(f"    (already {action.get('status')}, skipping)\n")
+            say(f"    (already {action.get('status')}, skipping)\n")
             continue
 
         describe_action(i, action)
@@ -352,19 +353,19 @@ def _cmd_review(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
                 action["status"] = "approved"
                 action["reviewed"] = _stamp()
                 save_suggestion(path, data)
-                print("    → Approved\n")
+                say("    → Approved\n")
                 break
             elif choice in ("r", "reject"):
                 action["status"] = "rejected"
                 action["reviewed"] = _stamp()
                 save_suggestion(path, data)
-                print("    → Rejected\n")
+                say("    → Rejected\n")
                 break
             elif choice in ("s", "skip"):
-                print("    → Skipped\n")
+                say("    → Skipped\n")
                 break
             elif choice in ("q", "quit"):
-                print("Review aborted.")
+                say("Review aborted.")
                 return
 
 
@@ -380,9 +381,9 @@ def _cmd_execute(args: argparse.Namespace, suggestion_files: list[Path]) -> None
                 continue
             any_approved = True
 
-            print(f"\n{'=' * 60}")
-            print(f"File: {f.name} — Action {i + 1}: {action.get('type')}")
-            print(f"{'=' * 60}")
+            say(f"\n{'=' * 60}")
+            say(f"File: {f.name} — Action {i + 1}: {action.get('type')}")
+            say(f"{'=' * 60}")
             describe_action(i + 1, action)
 
             ok = execute_action(action, dry_run=args.dry_run)
@@ -391,11 +392,11 @@ def _cmd_execute(args: argparse.Namespace, suggestion_files: list[Path]) -> None
                 action["status"] = "executed"
                 action["executed"] = _stamp()
                 save_suggestion(f, data)
-                print("    → Executed\n")
+                say("    → Executed\n")
 
     if not any_approved:
-        print("No approved actions to execute.")
-        print("Use --review <file> to approve individual actions first.")
+        say("No approved actions to execute.")
+        say("Use --review <file> to approve individual actions first.")
 
 
 def main() -> None:
@@ -407,7 +408,7 @@ def main() -> None:
     suggestion_files = list_suggestion_files(RAW_SUGGESTIONS_DIR)
 
     if not suggestion_files:
-        print("No suggestions in raw/suggestions/")
+        say("No suggestions in raw/suggestions/")
         return
 
     if args.list:

@@ -20,7 +20,7 @@ import sys
 from claude_agent_sdk import query
 
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import QA_DIR, ROOT_DIR
 from core.prompts import render
 from core.sdk_helpers import (
@@ -223,7 +223,7 @@ def _print_answer(result: SdkRunResult, question: str, *, as_json: bool) -> None
     agents; same posture as `wiki doctor --json`) — consumers parse this
     payload instead of scraping the banner + prose off stdout."""
     if as_json:
-        print(
+        say(
             json.dumps(
                 {
                     "question": question,
@@ -235,7 +235,7 @@ def _print_answer(result: SdkRunResult, question: str, *, as_json: bool) -> None
             )
         )
     else:
-        print("\n" + result.result_text)
+        say("\n" + result.result_text)
 
 
 def _bump_query_counters(state: dict) -> None:

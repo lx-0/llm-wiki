@@ -15,20 +15,20 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import LOGS_DIR
 
 
 def _list() -> NoReturn:
     from producers import all_producers
 
-    print(f"{'NAME':<14} {'ENABLED-KEY':<40} GLOB-KEY")
-    print("─" * 100)
+    say(f"{'NAME':<14} {'ENABLED-KEY':<40} GLOB-KEY")
+    say("─" * 100)
     for p in all_producers():
         spec = p.SPEC
         enabled = spec.enabled_config_key or "(always)"
         globs = spec.source_glob_config_key or "(any source)"
-        print(f"{spec.name:<14} {enabled:<40} {globs}")
+        say(f"{spec.name:<14} {enabled:<40} {globs}")
     sys.exit(0)
 
 
@@ -39,8 +39,8 @@ def _run_one(name: str, source: Path) -> NoReturn:
 
     producer = get_producer(name)
     if producer is None:
-        print(f"error: no producer registered with name {name!r}", file=sys.stderr)
-        print("       try: wiki produce --list", file=sys.stderr)
+        say(f"error: no producer registered with name {name!r}", file=sys.stderr)
+        say("       try: wiki produce --list", file=sys.stderr)
         sys.exit(1)
 
     # Producers' internal logic computes `source.relative_to(ROOT_DIR)`.
@@ -52,18 +52,18 @@ def _run_one(name: str, source: Path) -> NoReturn:
         source = (ROOT_DIR / source).resolve()
 
     if not source.exists():
-        print(f"error: source path does not exist: {source}", file=sys.stderr)
+        say(f"error: source path does not exist: {source}", file=sys.stderr)
         sys.exit(1)
 
     result = asyncio.run(evaluate_and_run(producer, source))
 
-    print(f"{result.producer}: {result.status}")
+    say(f"{result.producer}: {result.status}")
     if result.reason:
-        print(f"  reason: {result.reason}")
+        say(f"  reason: {result.reason}")
     if result.outputs:
-        print(f"  outputs ({len(result.outputs)}):")
+        say(f"  outputs ({len(result.outputs)}):")
         for out in result.outputs:
-            print(f"    {out}")
+            say(f"    {out}")
 
     sys.exit(0 if result.status != "failed" else 1)
 

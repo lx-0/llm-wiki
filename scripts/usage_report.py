@@ -9,6 +9,7 @@ import argparse
 import json
 import sys
 
+from core.console import say
 from core.usage import USAGE_FILE
 
 
@@ -29,7 +30,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if not USAGE_FILE.exists():
-        print(
+        say(
             "No usage recorded yet (state/usage.json absent). "
             "Run a compile / dream / reconcile / collect first."
         )
@@ -37,7 +38,7 @@ def main() -> int:
 
     data = json.loads(USAGE_FILE.read_text(encoding="utf-8"))
     if args.json:
-        print(json.dumps(data, indent=2, sort_keys=True))
+        say(json.dumps(data, indent=2, sort_keys=True))
         return 0
 
     days = sorted(data.keys(), reverse=True)
@@ -46,20 +47,20 @@ def main() -> int:
 
     agg: dict[str, list[int]] = {}
     for day in days:
-        print(f"\n{day}")
+        say(f"\n{day}")
         for key in sorted(data[day]):
             u = data[day][key]
             i, o, c = u.get("input_tokens", 0), u.get("output_tokens", 0), u.get("calls", 0)
-            print(_row(key, i, o, c))
+            say(_row(key, i, o, c))
             a = agg.setdefault(key, [0, 0, 0])
             a[0] += i
             a[1] += o
             a[2] += c
 
-    print(f"\nTotals ({len(days)} day(s) shown):")
+    say(f"\nTotals ({len(days)} day(s) shown):")
     for key in sorted(agg):
         i, o, c = agg[key]
-        print(_row(key, i, o, c))
+        say(_row(key, i, o, c))
     return 0
 
 

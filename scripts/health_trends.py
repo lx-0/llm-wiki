@@ -30,7 +30,7 @@ from statistics import mean
 
 from core import frontmatter, markers
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import CONCEPTS_DIR, ROOT_DIR
 from core.utils import now_iso
 
@@ -192,7 +192,7 @@ def run(dry_run: bool) -> int:
         return 0
     block = render_block(health_dir)
     if dry_run:
-        print(block)
+        say(block)
         return 0
     new_text = _upsert_block(HEALTH_PAGE, block)
     HEALTH_PAGE.write_text(new_text, encoding="utf-8")

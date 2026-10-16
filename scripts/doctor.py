@@ -23,6 +23,7 @@ import subprocess
 import sys
 
 from core import actions
+from core.console import say
 from core.contracts import DoctorJSON, HealthSummaryJSON
 from core.health import (
     CheckResult,
@@ -159,9 +160,9 @@ def main() -> int:
     summary = health_summary(results)
 
     if args.json:
-        print(render_json(results, summary))
+        say(render_json(results, summary))
     else:
-        print(render_pretty(results, summary))
+        say(render_pretty(results, summary))
 
     return _exit_code(results)
 

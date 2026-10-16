@@ -11,7 +11,7 @@ import argparse
 import sys
 from typing import NoReturn
 
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import LOGS_DIR
 
 
@@ -20,25 +20,25 @@ def _list_mappings() -> NoReturn:
 
     mappings = CONFIG.personal.inbox_bridges
     if not mappings:
-        print("no inbox bridges configured (personal.inbox_bridges is empty)")
-        print("see `wiki bridge --help` for the config shape")
+        say("no inbox bridges configured (personal.inbox_bridges is empty)")
+        say("see `wiki bridge --help` for the config shape")
         sys.exit(0)
 
-    print(f"{'NAME':<28} {'MODE':<6} {'EN':<3} REMOTE -> LOCAL")
-    print("─" * 100)
+    say(f"{'NAME':<28} {'MODE':<6} {'EN':<3} REMOTE -> LOCAL")
+    say("─" * 100)
     for m in mappings:
         from bridge.drive_sync import _mapping_name  # type: ignore
 
         name = _mapping_name(m) if isinstance(m, dict) else "<invalid>"
         if not isinstance(m, dict):
-            print(f"{name:<28} {'?':<6} {'?':<3} (mapping is not a dict)")
+            say(f"{name:<28} {'?':<6} {'?':<3} (mapping is not a dict)")
             continue
         mode = str(m.get("mode", "move"))[:6]
         enabled = "y" if m.get("enabled", True) else "n"
         remote = str(m.get("remote", "?"))
         local = str(m.get("local", "?"))
-        print(f"{name:<28} {mode:<6} {enabled:<3} {remote}")
-        print(f"{'':<28} {'':<6} {'':<3}  -> {local}")
+        say(f"{name:<28} {mode:<6} {enabled:<3} {remote}")
+        say(f"{'':<28} {'':<6} {'':<3}  -> {local}")
     sys.exit(0)
 
 
@@ -48,7 +48,7 @@ def _run_sync(dry_run: bool) -> NoReturn:
 
     mappings = CONFIG.personal.inbox_bridges
     if not mappings:
-        print("no inbox bridges configured (personal.inbox_bridges is empty) — nothing to do")
+        say("no inbox bridges configured (personal.inbox_bridges is empty) — nothing to do")
         sys.exit(0)
 
     summary = run(mappings, dry_run=dry_run)
@@ -56,11 +56,11 @@ def _run_sync(dry_run: bool) -> NoReturn:
     for r in summary.results:
         marker = {"ok": "✓", "skipped": "—", "failed": "✗"}.get(r.status, "?")
         if r.reason:
-            print(f"  {marker} {r.name}: {r.status} ({r.reason})")
+            say(f"  {marker} {r.name}: {r.status} ({r.reason})")
         else:
-            print(f"  {marker} {r.name}: {r.status}")
+            say(f"  {marker} {r.name}: {r.status}")
 
-    print(
+    say(
         f"\n{summary.ok_count} ok · {summary.skipped_count} skipped · {summary.failed_count} failed"
     )
     sys.exit(summary.exit_code)

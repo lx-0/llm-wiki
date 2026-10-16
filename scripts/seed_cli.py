@@ -17,7 +17,7 @@ from pathlib import Path
 
 from cli_help import H_SEED, print_help
 from core import jqjson, seed
-from core.console import banner, fail, info, ok, warn
+from core.console import banner, fail, info, ok, say, warn
 from core.paths import ROOT_DIR, WIKI_DIR
 from dashboard import agent_buttons
 
@@ -417,7 +417,7 @@ def main(argv: list[str] | None = None) -> int:
         # the bash `wiki` guards every command so; seed writes a whole vault's templates, so
         # it guards itself too (cli.main called straight from a test once seeded the
         # checkout's parent)
-        print(
+        say(
             f"wiki: {ROOT_DIR} is not an Obsidian vault (no .obsidian/ directory).\n"
             "    The engine only runs against real vaults — install it as <vault>/.wiki/\n"
             "    and invoke `wiki` from there.",
@@ -438,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if not seed_vault(ROOT_DIR, WIKI_DIR, force=force, check=check, only=only):
         fail(f"no seedable template matches '{only}' — nothing done.")
-        print(_SEEDABLE, file=sys.stderr)
+        say(_SEEDABLE, file=sys.stderr)
         return 1
     if not check:
         from cli import refresh_dashboards

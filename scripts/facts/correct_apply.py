@@ -28,7 +28,7 @@ from claude_agent_sdk import query
 from core import frontmatter
 from core.backup import backup, stamp
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.links import (
     WIKILINK_RE,
     rename_article,
@@ -509,7 +509,7 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
 
     log.info("Agent done. Tokens — input: %d, output: %d", total_input_tokens, total_output_tokens)
     if result_text:
-        print("\n" + result_text + "\n")
+        say("\n" + result_text + "\n")
 
     # Execute engine-owned destructive ops the agent proposed (it has no shell).
     # Renames here; deletions are deferred to S02's `.trash` executor.

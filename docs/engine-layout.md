@@ -49,7 +49,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   ├── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
 │   │   ├── health/                ← vault-health checks behind the home-screen banner + `wiki doctor`: `environment` / `engine` / `pipeline` by subsystem, `_base` (CheckResult), `__init__` the API + build_health; the package binds no patched name (tests patch the submodule)
-│   │   ├── console.py             ← the engine's one logging setup (`setup_console_logging`, called from entry points only — never at import; per-CLI formatter hook)
+│   │   ├── console.py             ← the engine's one logging setup (`setup_console_logging`, called from entry points only — never at import; per-CLI formatter hook) and the one output path of the command modules (`say` + `ok` / `warn` / `info` / `fail` / `print_error`; gate: `tests/test_output_seam.py`)
 │   │   ├── actions.py             ← action catalogue — the operator-facing vocabulary of everything a consumer can run (menu + desktop JSON contract)
 │   │   ├── contracts.py           ← the schema-2 `--json` payloads typed once (MenuJSON, DoctorJSON, …) + the generator of `docs/contracts/{menu,doctor}.schema.json` (`python -m core.contracts --write / --check`)
 │   │   ├── links.py               ← wikilink resolution + relativization — single source of truth (resolve_link / canonical_slug / relativize_text)
@@ -259,6 +259,7 @@ appears somewhere else. Use the seam — never hand-roll the job beside it.
 | Start another engine process | `core/entry.py` (`python -m <module>`, `scripts/` on PYTHONPATH) | `tests/test_entry.py`, `tests/test_cli_dispatch.py` |
 | Recognise, build, merge or remove an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`, `merge`, `without_wiki_hooks`, `wiki_commands`); `wiki hooks` / `wiki status` (`hooks_cli.py`) and doctor's `hooks-installed` use it, and count a hook only where an agent would run it | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`), `tests/test_agents_merge.py` (merged and uninstalled configs byte-identical to the bash's) |
 | Console + file logging | `core/console.py:setup_console_logging` — entry points only, never at import | `tests/test_console.py::TestOneSetupEverywhere` |
+| Command output | `core/console.py:say` and the status helpers — no `print(` in a command module | `tests/test_output_seam.py` |
 | Read / write frontmatter | `core/frontmatter.py` | `tests/test_frontmatter_parity.py` (no private grammar, no fence grammar outside the seam) |
 | Back up a file before writing it | `core/backup.py` (`backup` for the `<name>.bak.<stamp>` sibling, `backup_path` for a writer's own name); two backups in one second keep both | `tests/test_backup.py` (no second backup stamp under `scripts/`) |
 | Slugs and filenames | `core/utils.py:slugify` (`ascii_only=True` for filenames) | `tests/test_slugify.py::test_no_second_slug_grammar_outside_the_seam` |

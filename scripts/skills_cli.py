@@ -28,7 +28,7 @@ from pathlib import Path
 
 from cli_help import H_SKILLS, print_help
 from core import config as core_config
-from core.console import banner, info, ok, print_error, warn
+from core.console import banner, info, ok, print_error, say, warn
 from core.paths import ROOT_DIR, WIKI_DIR
 
 # The skills safe to link outside a vault — keep it tight; the others work inside one.
@@ -225,7 +225,7 @@ def install(global_flag: bool | None) -> int:
     if added + skipped + foreign == 0:
         info(f"no skills found in {_src()} — nothing to do")
     if _global_enabled():
-        print()
+        say()
         g_added, g_skipped, g_foreign = install_global()
         info("global install (skills.global_install: true)")
         if g_added:
@@ -256,7 +256,7 @@ def uninstall(global_flag: bool | None) -> int:
     if global_flag:
         _set_global(False)
         removed = uninstall_global()
-        print()
+        say()
         if removed:
             ok(f"removed {removed} global symlink(s) from {_global_dst()}")
         else:
@@ -289,8 +289,8 @@ def sync() -> int:
 
 def status() -> int:
     banner("wiki skills status")
-    print(f"{'SKILL':<32} STATE")
-    print("─" * 62)
+    say(f"{'SKILL':<32} STATE")
+    say("─" * 62)
     src, dst = _src(), _dst()
     if not src.is_dir():
         info(f"no {src} directory")
@@ -303,7 +303,7 @@ def status() -> int:
             state = f"{_styled('collision', '33')} (foreign entry — not managed)"
         else:
             state = _styled("missing", "2")
-        print(f"{name:<32} {state}")
+        say(f"{name:<32} {state}")
     if dst.is_dir():
         stale = [
             link.name
@@ -311,17 +311,17 @@ def status() -> int:
             if _engine_owned(link) and not (src / link.name).is_dir()
         ]
         if stale:
-            print()
+            say()
             warn("stale engine-owned symlinks (source no longer exists):")
             for name in stale:
-                print(f"  {name}")
+                say(f"  {name}")
             info("Run 'wiki skills sync' to prune them.")
-    print()
+    say()
     if _global_enabled():
-        print(f"{'GLOBAL INSTALL':<32} {_styled('on', '32')}  (skills.global_install)")
+        say(f"{'GLOBAL INSTALL':<32} {_styled('on', '32')}  (skills.global_install)")
     else:
         hint = "(skills.global_install — wiki skills install --global)"
-        print(f"{'GLOBAL INSTALL':<32} {_styled('off', '2')} {hint}")
+        say(f"{'GLOBAL INSTALL':<32} {_styled('off', '2')} {hint}")
     for name in GLOBAL_SKILLS:
         link = _global_dst() / name
         if link.is_symlink():
@@ -336,19 +336,19 @@ def status() -> int:
             state = f"{_styled('collision', '33')} (foreign entry — not managed)"
         else:
             state = _styled("not linked", "2")
-        print(f"  {name:<30} {state}")
+        say(f"  {name:<30} {state}")
     registry = _registry()
     if registry.is_file():
-        print(f"  {'registry':<30} {registry}")
+        say(f"  {'registry':<30} {registry}")
         for vault in _registry_lines():
             if not vault:
                 continue
             if os.access(Path(vault) / ".wiki" / "wiki", os.X_OK):
-                print(f"    {_styled('✓', '32')} {vault}")
+                say(f"    {_styled('✓', '32')} {vault}")
             else:
-                print(f"    {_styled('!', '33')} {vault} {_styled('(stale — no .wiki/wiki)', '2')}")
+                say(f"    {_styled('!', '33')} {vault} {_styled('(stale — no .wiki/wiki)', '2')}")
     else:
-        print(f"  {'registry':<30} {_styled(f'none ({registry})', '2')}")
+        say(f"  {'registry':<30} {_styled(f'none ({registry})', '2')}")
     return 0
 
 

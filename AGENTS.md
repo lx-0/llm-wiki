@@ -315,6 +315,7 @@ Long-term direction: remove agent-side filesystem writes entirely — agent retu
   it stays one module (`tests/test_module_size.py`). Both lists only shrink — split the code,
   don't extend the list.
 - No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `core/console` (`ok` / `warn` / `info` / `fail` / `print_error`); the bootstrap `wiki` has only its `die`.
+- A command module (any handler the catalogue dispatches) writes its output through `core/console`: `say` for plain lines (print's contract), the helpers above for status. It never calls `print(` itself; `tests/test_output_seam.py` refuses one outside its allowlist, which names a reason per entry.
 - Commit messages: imperative mood, short subject (≤70 chars), body explains why.
 
 ## When in doubt

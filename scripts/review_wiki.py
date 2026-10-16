@@ -19,7 +19,7 @@ from pathlib import Path
 
 from core import ollama_client
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import KNOWLEDGE_DIR, REPORTS_DIR
 from core.prompts import render
 from core.utils import (
@@ -213,21 +213,19 @@ def main():
     if args.limit:
         articles = articles[: args.limit]
 
-    print(f"Articles to review: {len(articles)}")
-    print(f"Model: {args.model}")
+    say(f"Articles to review: {len(articles)}")
+    say(f"Model: {args.model}")
 
     if args.dry_run:
         for a in articles:
             wc = get_article_word_count(a)
-            print(f"  {a.relative_to(KNOWLEDGE_DIR)} ({wc} words)")
+            say(f"  {a.relative_to(KNOWLEDGE_DIR)} ({wc} words)")
         return
 
     # Check Ollama connectivity
     if not ollama_client.is_reachable():
-        print(f"ERROR: Cannot reach Ollama at {CONFIG.models.ollama_url}")
-        print(
-            "Is the Ollama server reachable? Check `ollama serve` locally or your remote endpoint."
-        )
+        say(f"ERROR: Cannot reach Ollama at {CONFIG.models.ollama_url}")
+        say("Is the Ollama server reachable? Check `ollama serve` locally or your remote endpoint.")
         sys.exit(1)
 
     abort_n = CONFIG.limits.review_consecutive_failure_abort
@@ -255,18 +253,18 @@ def main():
                 i - 1,
                 len(articles),
             )
-            print(
+            say(
                 f"\nDeadline reached after {i - 1}/{len(articles)} reviews — "
                 f"partial report saved. (Next run continues the weekly cadence.)"
             )
             break
         rel = article.relative_to(KNOWLEDGE_DIR)
-        print(f"[{i}/{len(articles)}] Reviewing {rel}...", end=" ", flush=True)
+        say(f"[{i}/{len(articles)}] Reviewing {rel}...", end=" ", flush=True)
         review = review_article(article, args.model)
         reviews.append(review)
 
         if "error" in review:
-            print(f"FAILED ({review.get('error_kind', '?')})")
+            say(f"FAILED ({review.get('error_kind', '?')})")
             # Only transport-level (ollama) failures count toward fail-fast;
             # a parse failure means kcma IS up, so it resets the streak.
             if review.get("error_kind") == "ollama":
@@ -279,7 +277,7 @@ def main():
                         i,
                         len(articles),
                     )
-                    print(
+                    say(
                         f"\nABORTED: {consecutive_ollama_failures} consecutive "
                         f"Ollama failures — is kcma reachable? Partial report saved."
                     )
@@ -288,7 +286,7 @@ def main():
             else:
                 consecutive_ollama_failures = 0
         else:
-            print(f"{review.get('overall', '?')}/5 ({review.get('verdict', '?')})")
+            say(f"{review.get('overall', '?')}/5 ({review.get('verdict', '?')})")
             consecutive_ollama_failures = 0
 
         # Incremental checkpoint so a later abort / kill / crash doesn't lose
@@ -299,15 +297,15 @@ def main():
             log.info("checkpoint: %d reviews persisted", len(reviews))
 
     md_path, json_path = _write_reports(reviews, args.model)
-    print(f"\nReport saved: {md_path}")
-    print(f"Raw data: {json_path}")
+    say(f"\nReport saved: {md_path}")
+    say(f"Raw data: {json_path}")
 
     # Summary
     valid = [r for r in reviews if "overall" in r]
     if valid:
         avg = sum(r["overall"] for r in valid) / len(valid)
         suffix = " (partial — sweep aborted)" if aborted else ""
-        print(f"\nAverage quality: {avg:.1f}/5 across {len(valid)} articles{suffix}")
+        say(f"\nAverage quality: {avg:.1f}/5 across {len(valid)} articles{suffix}")
     if aborted:
         sys.exit(1)
 

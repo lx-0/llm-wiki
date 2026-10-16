@@ -13,6 +13,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from core.config import TIMEZONE
+from core.console import say
 from core.index_sync import sync_index
 from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 
@@ -34,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         apply=not args.dry_run,
     )
     mode = "dry-run" if args.dry_run else "applied"
-    print(
+    say(
         f"index sync ({mode}): {stats['rows_before']} rows before · "
         f"{stats['kept']} kept · {stats['deduped']} deduped · "
         f"{stats['dropped_dangling']} dropped · {stats['appended']} appended · "

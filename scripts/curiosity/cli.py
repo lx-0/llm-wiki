@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from core.config import CONFIG
-from core.console import read_key, setup_console_logging
+from core.console import read_key, say, setup_console_logging
 from core.paths import ROOT_DIR
 from core.utils import now_iso
 from curiosity.backends import email as email_backend
@@ -103,12 +103,12 @@ def _list() -> NoReturn:
             )
         )
     if not rows:
-        print("No curiosity requests in raw/requests/.")
+        say("No curiosity requests in raw/requests/.")
         sys.exit(0)
-    print(f"{'FILE':<55} {'TYPE':<20} {'STATUS':<10} {'ACCOUNT':<12} TOPIC")
-    print("─" * 130)
+    say(f"{'FILE':<55} {'TYPE':<20} {'STATUS':<10} {'ACCOUNT':<12} TOPIC")
+    say("─" * 130)
     for fn, t, st, acc, topic in rows:
-        print(f"{fn:<55} {t:<20} {st:<10} {acc:<12} {topic}")
+        say(f"{fn:<55} {t:<20} {st:<10} {acc:<12} {topic}")
     sys.exit(0)
 
 
@@ -212,60 +212,60 @@ def _print_request_card(idx: int, total: int, path: Path, r: dict) -> None:
     provider its content goes to, so the operator's accept is informed.
     """
     bar = "─" * 78
-    print()
-    print(bar)
-    print(f"  [{idx}/{total}]  {path.name}")
-    print(bar)
-    print(f"  Topic       : {r.get('topic', '?')}")
+    say()
+    say(bar)
+    say(f"  [{idx}/{total}]  {path.name}")
+    say(bar)
+    say(f"  Topic       : {r.get('topic', '?')}")
     if r.get("type") == "folder-deep-scan":
         _print_folder_card_body(r)
         return
-    print(
+    say(
         f"  Folder      : {r.get('folder', '?')}   (confidence {r.get('folder_confidence', '?')}/5)"
     )
-    print(f"  Account     : {r.get('account', '?')}")
-    print(f"  Source      : {r.get('source', '?')}")
-    print(f"  Created     : {r.get('created', '?')}")
-    print(f"  Model       : {r.get('model', '?')}")
-    print()
+    say(f"  Account     : {r.get('account', '?')}")
+    say(f"  Source      : {r.get('source', '?')}")
+    say(f"  Created     : {r.get('created', '?')}")
+    say(f"  Model       : {r.get('model', '?')}")
+    say()
     quote = r.get("source_quote", "").strip()
     if quote:
-        print("  Source quote:")
+        say("  Source quote:")
         for line in quote.splitlines() or [quote]:
-            print(f"    > {line}")
+            say(f"    > {line}")
     rationale = r.get("rationale", "").strip()
     if rationale:
-        print()
-        print("  Why this folder:")
+        say()
+        say("  Why this folder:")
         for line in rationale.splitlines() or [rationale]:
-            print(f"    {line}")
-    print()
+            say(f"    {line}")
+    say()
 
 
 def _print_folder_card_body(r: dict) -> None:
     """folder-deep-scan card body — the informed-consent gate."""
     root_id = r.get("root_id", "?")
     file_path = r.get("file_path", "?")
-    print(f"  File        : {root_id}/{file_path}   (confidence {r.get('file_confidence', '?')}/5)")
+    say(f"  File        : {root_id}/{file_path}   (confidence {r.get('file_confidence', '?')}/5)")
     candidate = folder_backend._resolve(root_id, file_path)
     if candidate is not None:
         marker = "exists" if candidate.exists() else "MISSING — stale index?"
-        print(f"  Resolves to : {candidate}   ({marker})")
+        say(f"  Resolves to : {candidate}   ({marker})")
     else:
-        print(f"  Resolves to : (root {root_id!r} not in personal.watched_folders)")
-    print(f"  Source      : {r.get('source', '?')}")
-    print(f"  Created     : {r.get('created', '?')}")
-    print()
+        say(f"  Resolves to : (root {root_id!r} not in personal.watched_folders)")
+    say(f"  Source      : {r.get('source', '?')}")
+    say(f"  Created     : {r.get('created', '?')}")
+    say()
     provider = CONFIG.models.folder_scan_provider
-    print(f"  ⚠ Accept will LOAD this file and send its content to '{provider}'")
-    print(f'    to answer: "{r.get("topic", "?")}"')
+    say(f"  ⚠ Accept will LOAD this file and send its content to '{provider}'")
+    say(f'    to answer: "{r.get("topic", "?")}"')
     rationale = (r.get("rationale") or "").strip()
     if rationale:
-        print()
-        print("  Why this file:")
+        say()
+        say("  Why this file:")
         for line in rationale.splitlines() or [rationale]:
-            print(f"    {line}")
-    print()
+            say(f"    {line}")
+    say()
 
 
 def _mark_rejected(path: Path, r: dict) -> None:
@@ -341,12 +341,12 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
         # Single-keypress prompt — same DRY mechanism the home menu uses
         # (core.console.read_key in cbreak mode). No Enter required.
         _PROMPT = "  [a]ccept · [s]kip · [r]eject · [A]ccept ALL · [q]uit › "
-        print(_PROMPT, end="", flush=True)
+        say(_PROMPT, end="", flush=True)
         while True:
             try:
                 key = read_key()
             except (OSError, KeyboardInterrupt):
-                print()
+                say()
                 log.info(
                     "Walk aborted. %d accepted, %d skipped, %d rejected, %d remain.",
                     accepted,
@@ -356,24 +356,24 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 )
                 sys.exit(0)
             if key == "a":
-                print("a")
+                say("a")
                 ok = _dispatch(path, dry_run=dry_run)
                 accepted += 1
                 if not ok:
                     fails += 1
                 break
             if key == "A":  # accept ALL remaining (this item onward)
-                print("A")
+                say("A")
                 remaining = pending[idx - 1 :]
                 cloud = _folder_consent_lines(remaining)
                 if cloud:
                     prov = cloud[0][1]
-                    print(f"\n  ⚠ {len(cloud)} file(s) will be LOADED and sent to '{prov}':")
+                    say(f"\n  ⚠ {len(cloud)} file(s) will be LOADED and sent to '{prov}':")
                     for fp, _p in cloud[:15]:
-                        print(f"     {fp}")
+                        say(f"     {fp}")
                     if len(cloud) > 15:
-                        print(f"     … +{len(cloud) - 15} more")
-                print(
+                        say(f"     … +{len(cloud) - 15} more")
+                say(
                     f"\n  Accept ALL {len(remaining)} remaining request(s)? [y/N] › ",
                     end="",
                     flush=True,
@@ -383,10 +383,10 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 except (OSError, KeyboardInterrupt):
                     confirm = "n"
                 if confirm not in ("y", "Y"):
-                    print("n — cancelled")
-                    print("\r" + _PROMPT, end="", flush=True)
+                    say("n — cancelled")
+                    say("\r" + _PROMPT, end="", flush=True)
                     continue  # back to per-item prompt for THIS request
-                print("y")
+                say("y")
                 a, f = _accept_all(remaining, dry_run=dry_run)
                 accepted += a
                 fails += f
@@ -398,17 +398,17 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 )
                 sys.exit(0 if fails == 0 else 2)
             if key in ("s", "S", "enter"):
-                print("s")
+                say("s")
                 skipped += 1
                 break
             if key in ("r", "R"):
-                print("r")
+                say("r")
                 _mark_rejected(path, r)
                 rejected += 1
                 log.info("Rejected: %s (producer will skip this slug)", r.get("topic", path.name))
                 break
             if key in ("q", "Q", "c-c", "c-d", "esc"):
-                print("q")
+                say("q")
                 log.info(
                     "Walk ended. %d accepted, %d skipped, %d rejected, %d remain.",
                     accepted,
@@ -418,7 +418,7 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 )
                 sys.exit(0 if fails == 0 else 2)
             # Unknown key — beep / hint, keep prompting on same line.
-            print("\r" + _PROMPT, end="", flush=True)
+            say("\r" + _PROMPT, end="", flush=True)
     log.info(
         "Walk complete. %d accepted, %d skipped, %d rejected (of %d).",
         accepted,
@@ -438,7 +438,7 @@ def _clear_done() -> NoReturn:
         if r.get("status") == "done":
             p.unlink()
             removed += 1
-    print(f"Removed {removed} done request file(s).")
+    say(f"Removed {removed} done request file(s).")
     sys.exit(0)
 
 
