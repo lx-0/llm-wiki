@@ -4,7 +4,7 @@ slug: llm-wiki
 last_updated: 2026-10-16T04:25:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: T01
+active_task: T02
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,14 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 -- slice S05 complete (6/6) and reassessed (A: the order holds; S05's
-lessons are in S06's plan notes). Next slice: S06 (`M034-S06-PLAN.md`, 6 tasks: one table
-behind help and menu, the print gate, the collector registry, README/AGENTS budgets, 0.8.0,
-the milestone close). Run `/ytstack:plan-task` for S06-T01. Slices S01–S05 are complete (5/6).
+**Status:** M034 / S06 / T02 planned — ready to execute (`M034-S06-T02-PLAN.md`: one output
+path — `core.console.say` with print's contract, the 391 `print(` calls in 36 command modules
+converted, a gate refusing new ones). S06: 1/6 done. Slices S01–S05 are complete (5/6).
+
+T01 closed (`M034-S06-T01-SUMMARY.md`): one table behind `wiki help` and the home menu
+(0.7.32). Each catalogue command carries its menu entries. The TUI derives its categories
+(the help's groups, keys `v g i k d r`), its shortcut row and its fuzzy list from them. The
+dead flush entry left the menu. Exit criterion 4 is met.
 
 T06 closed (`M034-S05-T06-SUMMARY.md`, passed with caveats): the operator path ran end to end
 on scratch from the real 0.7.3 installer. That covered the update, the desktop's spawns, the

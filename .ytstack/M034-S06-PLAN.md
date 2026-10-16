@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M034-S06 -- Slice Plan
@@ -19,7 +19,7 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 -- One table. The home menu's quick actions, categories and fuzzy catalogue derive
+- [x] T01 -- One table. The home menu's quick actions, categories and fuzzy catalogue derive
   from `cli_catalog`, with `core/actions` for the pending-work rows. A test refuses a menu
   entry whose argv names no catalogue command. The hand-curated lists are deleted; the
   menu's golden is unchanged, apart from differences decided in the commit. Also: `menu.py`'s
