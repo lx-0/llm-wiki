@@ -208,13 +208,6 @@ def _read_frontmatter_field(path: Path, field: str) -> str | None:
     return frontmatter.field(head, field)
 
 
-def probe_flush_missing() -> int:
-    """1 if today's `daily/sessions/YYYY-MM-DD.md` is missing, else 0."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    target = DAILY_DIR / "sessions" / f"{today}.md"
-    return 0 if target.exists() else 1
-
-
 def probe_lint_stale() -> int:
     """1 if the newest lint report is older than the newest knowledge/ file.
 
@@ -283,7 +276,8 @@ def build_suggestions() -> list[SuggestionJSON]:
             5,
             lambda n: f"{n} entit{'ies' if n != 1 else 'y'} overdue for dream",
         ),
-        ("flush", probe_flush_missing, 6, lambda _: "today's session has not been flushed"),
+        # No "not flushed today" row: `wiki flush` needs the context file a hook hands it, and
+        # a failed flush is doctor's `flush-pipeline` check (M034-S06-T05).
         ("lint", probe_lint_stale, 7, lambda _: "knowledge edits since last lint sweep"),
     ]
     results: list[SuggestionJSON] = []

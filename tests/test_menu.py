@@ -288,6 +288,28 @@ def test_screen_renders_group_subheaders_in_order_with_continuous_numbering():
         assert token in html, f"missing position number {token}"
 
 
+def test_the_header_names_the_vault_without_a_revision_or_glyph(monkeypatch):
+    """The home screen's header is the vault's name (M034 exit criterion 5). The commit hash
+    cost a `git` child per redraw for what `wiki version` prints, and the ✨ beside "Nothing
+    pending" was decoration. A render spawns nothing."""
+    from html import escape
+
+    import menu
+
+    def no_child(*args, **kwargs):
+        raise AssertionError(f"the home screen spawned a process: {args[0]}")
+
+    for spawn in ("check_output", "run", "Popen"):
+        monkeypatch.setattr(menu.subprocess, spawn, no_child)
+    html = menu._build_screen_html(menu.HomeState())
+
+    header = html.splitlines()[1]
+    assert header == f"  <b><ansicyan>wiki</ansicyan></b> — {escape(menu.ROOT_DIR.name)} vault"
+    assert "Nothing pending — vault is current." in html
+    assert "✨" not in html
+    assert "commit" not in html
+
+
 def test_every_quick_action_key_rendered_in_footer():
     """Every declared QUICK_ACTIONS key must appear in the rendered home screen.
     This is the load-bearing guard for the dead-'t' regression (triage was

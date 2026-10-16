@@ -38,7 +38,6 @@ VERB_BY_COMMAND: dict[str, str] = {
     "lint": "Check",
     "dedup": "Review",
     "review-wiki": "Review",
-    "flush": "Save",
     "curiosity": "Explore",
     "suggestions": "Run",
     "gmail-auth": "Sign in",
@@ -137,7 +136,6 @@ _SPECS: tuple[ActionSpec, ...] = (
         "{n} pages need refreshing",
         tool=True,
     ),
-    _spec("flush", "Save", "do", ["flush"], "Save today's AI chat to your library"),
     _spec(
         "lint",
         "Check",

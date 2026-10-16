@@ -23,9 +23,9 @@ def test_titles_pluralize_on_count():
 
 
 def test_countless_titles_ignore_the_count():
-    spec = get("flush")
-    assert spec.title(None) == "Save today's AI chat to your library"
-    assert spec.title(5) == "Save today's AI chat to your library"
+    spec = get("links")
+    assert spec.title(None) == "Check links"
+    assert spec.title(5) == "Check links"
 
 
 def test_ids_are_unique_and_equal_their_keys():
@@ -39,6 +39,24 @@ def test_every_argv_starts_with_a_known_wiki_subcommand():
     known = set(cli.BY_NAME)  # every command is the catalogue's since M034-S05-T03
     for spec in CATALOGUE.values():
         assert spec.argv[0] in known, f"{spec.id}: {spec.argv[0]!r} is not a wiki subcommand"
+
+
+def test_no_action_runs_a_command_that_only_prints_its_usage():
+    """An action's argv does work. A bare command whose catalogue row answers the bare form
+    with its help and a failing exit cannot: `wiki flush` needs the context file and session
+    id a hook hands it. The "Save today's AI chat" action ran exactly that, and its probe read
+    the pre-rollup `daily/sessions/<date>.md`, so the TUI and the desktop offered it every
+    day and every click printed the usage (M034-S06-T05)."""
+    import cli
+
+    refusing = [
+        spec.id
+        for spec in CATALOGUE.values()
+        if len(spec.argv) == 1
+        and cli.BY_NAME[spec.argv[0]].show_help_on_empty
+        and cli.BY_NAME[spec.argv[0]].empty_help_exit != 0
+    ]
+    assert refusing == []
 
 
 def test_tools_are_non_destructive_invocations():

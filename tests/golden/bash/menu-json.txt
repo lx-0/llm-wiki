@@ -65,19 +65,6 @@ exit: 0
       "key": "N"
     },
     {
-      "id": "flush",
-      "title": "Save today's AI chat to your library",
-      "verb": "Save",
-      "group": "do",
-      "argv": [
-        "flush"
-      ],
-      "count": 1,
-      "label": "today's session has not been flushed",
-      "priority": 6,
-      "key": "N"
-    },
-    {
       "id": "lint",
       "title": "Notes changed since the last health check",
       "verb": "Check",

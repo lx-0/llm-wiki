@@ -34,7 +34,6 @@ def fake_vault(tmp_path, monkeypatch):
     raw_requests = raw / "requests"
     raw_suggestions = raw / "suggestions"
     daily = tmp_path / "daily"
-    daily_sessions = daily / "sessions"
     knowledge = tmp_path / "knowledge"
     people = knowledge / "people"
     projects = knowledge / "projects"
@@ -45,7 +44,7 @@ def fake_vault(tmp_path, monkeypatch):
         inbox,
         raw_requests,
         raw_suggestions,
-        daily_sessions,
+        daily,
         people,
         projects,
         areas,
@@ -213,20 +212,6 @@ def test_dream_overdue_counts_missing_and_old(fake_vault, monkeypatch):
     assert menu_context.probe_dream_overdue() == 2
 
 
-def test_flush_missing_returns_1_when_no_session_today(fake_vault):
-    import menu_context
-
-    assert menu_context.probe_flush_missing() == 1
-
-
-def test_flush_missing_returns_0_when_today_present(fake_vault):
-    import menu_context
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    (fake_vault / "daily" / "sessions" / f"{today}.md").write_text("x")
-    assert menu_context.probe_flush_missing() == 0
-
-
 def test_lint_stale_with_no_reports_returns_1(fake_vault, monkeypatch):
     import menu_context
 
@@ -247,9 +232,6 @@ def test_build_suggestions_returns_only_nonzero_counts_sorted(fake_vault):
     # Don't trigger compile (state with no changed sources).
     last_compile = datetime.now().replace(microsecond=0).isoformat()
     menu_context.STATE_FILE.write_text(json.dumps({"last_compile": last_compile}))
-    # Today's flush exists.
-    today = datetime.now().strftime("%Y-%m-%d")
-    (fake_vault / "daily" / "sessions" / f"{today}.md").write_text("x")
     # Lint cache exists, newer than knowledge.
     (fake_vault / ".wiki" / "reports" / "lint-2026-05-17.md").write_text("ok")
 

@@ -11,8 +11,6 @@ Determinism rules (every one of them is a flake that was reasoned about, not obs
     changed and the compile state reads as stalled on any calendar day;
   * entity pages are either never synthesized or synthesized on that same past day, so
     the dream-overdue count never flips at a cooldown boundary;
-  * today's `daily/sessions/<today>.md` is deliberately absent, so "flush missing" is 1
-    on every day;
   * HOME, PATH, the API-key env and the interpreter prefix are pinned by
     `patch_engine_paths`, and TCP connects raise, so no check can see the machine;
   * free-text fields are normalised (digits → N, tmp paths → placeholders) because the
@@ -126,7 +124,6 @@ def build_fixture_vault(root: Path) -> Path:
 
     (vault / "daily" / "2026-01-02").mkdir(parents=True)
     (vault / "daily" / "2026-01-02.md").write_text("# 2026-01-02\n\nA digest.\n", encoding="utf-8")
-    (vault / "daily" / "sessions").mkdir()  # today's file deliberately absent
 
     wiki = vault / ".wiki"
     for sub in ("state", "logs", "reports", "sessions"):

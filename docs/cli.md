@@ -33,7 +33,7 @@ Bare `wiki` runs `scripts/menu_context.py` to probe the vault (~150ms cold,
 hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
 
 ```
-  wiki — lxw vault (commit abc1234)
+  wiki — lxw vault
   384 articles · last compile 4h ago · ollama ✓     ← (1) status one-liner
 
   ▸ Actionable in your vault  (↑↓ Enter · 1-9 jump)  ← (2) unified actionable
@@ -70,22 +70,24 @@ hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
   setup-not-run → `wiki setup`; hooks-installed → `wiki hooks install`;
   compile-state when 30d+ stale → `wiki compile`). Severity glyph
   (✗ critical / ⚠ warning) in the gutter, position number for keyboard.
-- **Probe suggestions** from `menu_context.py` — seven signals, only
-  non-zero rows shown, in priority order:
+- **Probe suggestions** from `menu_context.py` — only non-zero rows shown, in
+  priority order:
 
-| # | Signal                                          | Dispatched command           |
-|---|-------------------------------------------------|------------------------------|
-| 1 | files in `inbox/`                               | `process-inbox`              |
-| 2 | sources newer than last compile                 | `compile`                    |
-| 3 | `raw/requests/*.json` with `status != done`     | `curiosity --run-oldest`     |
-| 4 | `raw/suggestions/*.yaml` `status: approved`     | `suggestions`                |
-| 5 | entity pages past `dream_cooldown_days`         | `dream`                      |
-| 6 | today's `daily/sessions/<date>.md` missing      | `flush`                      |
-| 7 | knowledge edits newer than newest lint report   | `lint --structural-only`     |
+| # | Signal                                          | Dispatched command                     |
+|---|-------------------------------------------------|----------------------------------------|
+| 1 | files in `inbox/`                               | `process-inbox`                        |
+| 2 | sources newer than last compile                 | `compile`                              |
+| 3 | pending folder-deep-scan requests               | `curiosity --type folder-deep-scan`    |
+| 4 | `raw/suggestions/*.yaml` `status: approved`     | `suggestions`                          |
+| 5 | entity pages past `dream_cooldown_days`         | `dream --all-entities`                 |
+| 6 | knowledge edits newer than newest lint report   | `lint --structural-only`               |
+| 7 | pending email-deep-scan requests                | `curiosity --type email-deep-scan`     |
 
 `↑/↓` walks the whole list, `Enter` dispatches the cursor's row, `1-9`
 jumps directly. When everything passes the section renders
-`✨ Nothing pending — vault is current.` instead.
+`Nothing pending — vault is current.` instead. There is no "not flushed today"
+row: `wiki flush` runs from a hook with the context file it hands over, and a
+failed flush is the `flush-pipeline` check below.
 
 **(2b) Heads-up** — critical/warning health checks WITHOUT a clean auto-fix
 (`ollama-unreachable`, `claude-authed`, `compile-errors-recent`,

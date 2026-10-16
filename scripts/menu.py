@@ -362,13 +362,12 @@ class HomeState:
 def _build_screen_html(state: HomeState) -> str:
     from html import escape
 
-    revision = _git_revision()
     vault_name = ROOT_DIR.name
     status_line = render_status_line(state.status) or "(no status fields)"
 
     lines: list[str] = [
         "",
-        f"  <b><ansicyan>wiki</ansicyan></b> — {escape(vault_name)} vault (commit {escape(revision)})",
+        f"  <b><ansicyan>wiki</ansicyan></b> — {escape(vault_name)} vault",
         f"  <ansibrightblack>{escape(status_line)}</ansibrightblack>",
         "",
     ]
@@ -416,7 +415,7 @@ def _build_screen_html(state: HomeState) -> str:
             )
         lines.append("")
     else:
-        lines.append("  <ansibrightblack>✨ Nothing pending — vault is current.</ansibrightblack>")
+        lines.append("  <ansibrightblack>Nothing pending — vault is current.</ansibrightblack>")
         lines.append("")
 
     # ── Heads-up: warnings without auto-fix ─────────────────────────
@@ -467,17 +466,6 @@ def _build_screen_html(state: HomeState) -> str:
     )
 
     return "\n".join(lines)
-
-
-def _git_revision() -> str:
-    try:
-        out = subprocess.check_output(
-            ["git", "-C", str(WIKI_DIR), "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        )
-        return out.decode().strip()
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
-        return "unknown"
 
 
 # ── Raw-mode single-key home picker ─────────────────────────────────
