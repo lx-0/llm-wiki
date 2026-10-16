@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M034-S05 -- Slice Plan
@@ -36,7 +36,7 @@ and `wiki` is the ≤ 150-line bootstrap, behind one help system.
   `lib/ui.sh`, whose last caller was the stash prompt. The in-process refusal test (T02's,
   in `test_wiki_update.py`) goes first, and `--help` switches to the `H_UPDATE` that T02
   already moved into `cli_help`. Proven at oracle parity.
-- [ ] T04 -- One help system. Each port moves its command's help text into `cli_help`:
+- [x] T04 -- One help system. Each port moves its command's help text into `cli_help`:
   `config` / `setup` in S02, `hooks` / `skills` in S03, `update` in T03 (`cmd_help` already
   went in S01-T05). This task checks that no bash help text is left, pins that with a test (no
   `help_*` heredoc in `wiki`), and makes `wiki help` and `wiki <cmd> -h` render from one place.

@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T03:50:00+02:00
+last_updated: 2026-10-16T04:05:00+02:00
 current_milestone: M034
 active_slice: S05
-active_task: T04
+active_task: T05
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,15 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S05: update + the last bash
 
-**Status:** M034 / S05 / T04 planned — ready to execute (`M034-S05-T04-PLAN.md`: one help
-system — `cli_help.print_help` behind the dispatcher and the five handlers, `wiki help <cmd>`,
-guards for no help in the bash and none printed past the seam). S05: 3/6 done. Slices S01–S04
-are complete (4/6).
+**Status:** M034 / S05 / T05 planned — ready to execute (`M034-S05-T05-PLAN.md`:
+`lib/common.sh` folds into `wiki` (≤ 150 lines, a budget test), `lib/` gone; the cloud rule's
+two copies held to one table; install.sh lets the first `wiki` call create the environment and
+links skills via `wiki skills sync`). S05: 4/6 done. Slices S01–S04 are complete (4/6).
+
+T04 closed (`M034-S05-T04-SUMMARY.md`): one help system (0.7.30).
+- `cli_help.print_help` sits behind the dispatcher and the five handlers.
+- `wiki help <cmd>` prints that command's help.
+- Two guards: no help in the bash, and none printed past the seam.
 
 T03 closed (`M034-S05-T03-SUMMARY.md`): all of `wiki update` is Python (0.7.29). `cmd_update`
 and `lib/ui.sh` are gone, and `wiki` is 113 lines of bootstrap. The 14 records pass
