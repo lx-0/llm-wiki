@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M034-S05 -- Slice Plan
@@ -23,7 +23,7 @@ and `wiki` is the ≤ 150-line bootstrap, behind one help system.
     re-apply on confirm);
   - `uv sync`, the migrations and the skills sync (`--no-skills`);
   - the `--post-pull` re-exec and the summary line.
-- [ ] T02 -- `update`'s phase 2 in Python: `wiki update --post-pull <rev> [--no-skills]`,
+- [x] T02 -- `update`'s phase 2 in Python: `wiki update --post-pull <rev> [--no-skills]`,
   the steps after the pull (summary line, `uv sync`, the cloud-vault hints, both migrations,
   the skills sync). The bash phase 1 re-executes into it, which is the cross-version path
   every operator takes: a 0.7.3 bash pulling the new engine lands here. The hook-environment
@@ -33,8 +33,9 @@ and `wiki` is the ≤ 150-line bootstrap, behind one help system.
 - [ ] T03 -- `update`'s phase 1 in Python: the flags, the not-a-checkout and dirty-tree
   guards, the stash on a terminal, the `--ff-only` pull, the re-apply check, and the
   re-execution of the pulled engine's entry. The bash `cmd_update` is deleted, and with it
-  `lib/ui.sh`, whose last caller was the stash prompt. The refusal test in `test_cli.py`
-  goes first, and the help text moves to `cli_help`. Proven at oracle parity.
+  `lib/ui.sh`, whose last caller was the stash prompt. The in-process refusal test (T02's,
+  in `test_wiki_update.py`) goes first, and `--help` switches to the `H_UPDATE` that T02
+  already moved into `cli_help`. Proven at oracle parity.
 - [ ] T04 -- One help system. Each port moves its command's help text into `cli_help`:
   `config` / `setup` in S02, `hooks` / `skills` in S03, `update` in T03 (`cmd_help` already
   went in S01-T05). This task checks that no bash help text is left, pins that with a test (no

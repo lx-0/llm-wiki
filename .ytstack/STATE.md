@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T03:20:00+02:00
+last_updated: 2026-10-16T03:40:00+02:00
 current_milestone: M034
 active_slice: S05
-active_task: T02
+active_task: T03
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,11 +14,15 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S05: update + the last bash
 
-**Status:** M034 / S05 / T02 planned — ready to execute (`M034-S05-T02-PLAN.md`: update's
-phase 2, `--post-pull`, in Python; the bash phase 1 re-executes into it, the cross-version
-path; the hook-environment check shares `wiki doctor`'s walker). S05 has 6 tasks now: the
-port was split by phase at planning (T02 phase 2, T03 phase 1 with `lib/ui.sh`). 1/6 done.
-Slices S01–S04 are complete (4/6).
+**Status:** M034 / S05 / T03 planned — ready to execute (`M034-S05-T03-PLAN.md`: update's
+phase 1 in Python, so all of update is; `cmd_update` and `lib/ui.sh` deleted; held to the 14
+records, the pty stash cases included). S05: 2/6 done. Slices S01–S04 are complete (4/6).
+
+T02 closed (`M034-S05-T02-SUMMARY.md`): `wiki update --post-pull` runs in Python
+(`scripts/update_cli.py`, 0.7.28). All 14 records pass unchanged.
+- A scratch vault on the real 0.7.3 tree updated through its own bash and landed in the
+  Python phase 2.
+- `wiki doctor` and update share one hook walker (`core.agents.installed_wiki_commands`).
 
 T01 closed (`M034-S05-T01-SUMMARY.md`): the bash `wiki update` is on record, in 14 goldens
 from a fixture engine tracking a local `file://` origin. The stash path is recorded through a
