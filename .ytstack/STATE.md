@@ -4,7 +4,7 @@ slug: llm-wiki
 last_updated: 2026-10-16T04:25:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: T02
+active_task: T03
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,9 +14,15 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 / S06 / T02 planned — ready to execute (`M034-S06-T02-PLAN.md`: one output
-path — `core.console.say` with print's contract, the 391 `print(` calls in 36 command modules
-converted, a gate refusing new ones). S06: 1/6 done. Slices S01–S05 are complete (5/6).
+**Status:** M034 / S06 / T03 planned — ready to execute (`M034-S06-T03-PLAN.md`: the
+collector registry as a lazy name → module table; `--list` keeps importing every collector for
+the desktop's `configured`, exit criterion 6 amended with the measurement). S06 re-cut to 7
+tasks (collectors: registry T03, verb T04). S06: 2/7 done. Slices S01–S05 are complete (5/6).
+
+T02 closed (`M034-S06-T02-SUMMARY.md`): one output path. `core.console.say` replaces the 391
+`print(` calls in 36 command modules, and an AST gate refuses a new one. No output byte
+changed. Exit criterion 5 is met. CI went red once on an unformatted test (fixed in
+`4f4e745`); a local script now runs the CI's exact gates before a push.
 
 T01 closed (`M034-S06-T01-SUMMARY.md`): one table behind `wiki help` and the home menu
 (0.7.32). Each catalogue command carries its menu entries. The TUI derives its categories

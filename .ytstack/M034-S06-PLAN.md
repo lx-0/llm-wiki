@@ -4,8 +4,8 @@ slice: S06
 project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
-task_count: 6
-completed_tasks: 1
+task_count: 7
+completed_tasks: 2
 ---
 
 # M034-S06 -- Slice Plan
@@ -26,28 +26,36 @@ completed_tasks: 1
   non-TTY fallback still spawns `wiki help` (bash → python → python) and can print
   `cli.render_help()` in-process. The output is the same (`menu-no-tty` golden); noted in
   S01-T05.
-- [ ] T02 -- `print` → `core/console` across the command modules. A gate refuses `print(` in
+- [x] T02 -- `print` → `core/console` across the command modules. A gate refuses `print(` in
   command modules outside an allowlist with reasons (JSON payload writers and the TUI frame
   writer among them). The count goes before → after; `--json` stays payload-only.
-- [ ] T03 -- Collectors: a name → module table with lazy registration (`wiki collect --list`
-  imports no collector module, guarded by a test), and `wiki collect <name> -- <flags>` passed
-  through to the collectors' `main(argv)`. The three by-path entry scripts and PROCESS.md's
-  second invocation form are deleted.
+- [ ] T03 -- Collectors, the registry: a name → module table with lazy registration.
+  Importing the `collectors` package imports no collector module, and `wiki collect <name>`
+  imports only its own, both guarded by tests.
+
+  `--list` still imports every collector: the desktop's `collect --list --json` shows each
+  one's `configured`, and that is the collector's own probe. The exit criterion's "`--list`
+  imports no collector module" is amended with the measurement. `import collectors` costs
+  0.07 s, 0.067 s of it `collectors.base` + `core.config`; the 0.25 s of the backlog
+  (2026-10-14) is gone. Recorded in DECISIONS. (Split at planning, as S05 split update.)
+- [ ] T04 -- Collectors, the verb: `wiki collect <name> -- <flags>` passes the flags to the
+  collector's `main(argv)` (screenshots, browser, tabs, youtube). The three by-path entry
+  scripts and PROCESS.md's second invocation form are deleted.
 
   This includes every bare `uv run --project .wiki …` line PROCESS.md still teaches; there
   were 12 at S01-T07: the `scan_*` flags, `collectors.cli`, and `dashboard.dashboard_stats`
   / `dashboard_lint`. Each becomes a `wiki` command. On an iCloud vault the bare form
   ignores the engine's environment location and recreates the in-vault venv. S01-T07 fixed
   the same defect in the use-llm-wiki skill (`wiki stats`).
-- [ ] T04 -- Surfaces: `README.md` ≤ 300 lines and `AGENTS.md` ≤ 250, each section naming its
+- [ ] T05 -- Surfaces: `README.md` ≤ 300 lines and `AGENTS.md` ≤ 250, each section naming its
   reader; the TUI's ✨ glyph and the commit hash in its header are removed. The doc audit
   finds no stale names.
-- [ ] T05 -- Release 0.8.0:
+- [ ] T06 -- Release 0.8.0:
   - CHANGELOG with the "For your vault" section, version and lock;
   - engine-layout, FEATURES and cli.md current;
   - the DECISIONS milestone entry against the nine exit criteria;
   - the infographics by rule: change only if a box names a moved component.
-- [ ] T06 -- Milestone close: the full backlog fan-out against the code (DECISIONS 2026-08-27
+- [ ] T07 -- Milestone close: the full backlog fan-out against the code (DECISIONS 2026-08-27
   method), PRIORITY.md re-cut, then `ytstack:reassess-roadmap` for the last slice.
 
 ## Done when

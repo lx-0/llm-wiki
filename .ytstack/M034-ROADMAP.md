@@ -66,7 +66,8 @@ and three tables.
   `cli_help` (`cmd_help` went in S01-T05). Done: five releases (0.7.27–0.7.31). Update is
   Python, and a real 0.7.3 bash hands over to it. `wiki` is a 129-line bootstrap with no
   library. The operator path ran on scratch.
-- [ ] S06 -- **Surface diet + close** (6 tasks).
+- [ ] S06 -- **Surface diet + close** (7 tasks; the collectors split at planning: registry,
+  then verb).
   - One table behind help and menu; `print` → `core/console` with its gate; the lazy
     collector registry and the collect verb.
   - README ≤ 300 and AGENTS.md ≤ 250; the TUI cosmetics.
