@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M034-S04 -- Slice Plan
@@ -40,7 +40,7 @@ Deleting the library means the installer seeds through `wiki seed` after the ven
 
   Byte parity with the bash. The bash's outputs are recorded as goldens and pushed before
   T05 deletes it (S03-T07's pattern).
-- [ ] T03 -- **The special merges, pure** (as T01's fixes left them, 0.7.20 / 0.7.21):
+- [x] T03 -- **The special merges, pure** (as T01's fixes left them, 0.7.20 / 0.7.21):
   - the list union for community plugins and `appearance.json`'s snippets
     (`_merge_list_union`: writes only when it adds; jq `unique` on a merge);
   - the two button registries by id, in place (`_merge_registry`: Meta-Bind's

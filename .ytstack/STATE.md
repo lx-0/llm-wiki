@@ -4,7 +4,7 @@ slug: llm-wiki
 last_updated: 2026-10-16T02:35:00+02:00
 current_milestone: M034
 active_slice: S04
-active_task: T03
+active_task: T04
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,14 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 / S04 / T03 planned — ready to execute (`M034-S04-T03-PLAN.md`: the
-special merges, pure — the list union, the two registries by id, the `.env` append — held to
-goldens recorded from the bash and to a copy of the live configs). 2/5 tasks done in slice;
-slices S01–S03 are complete (3/6).
+**Status:** M034 / S04 / T04 planned — ready to execute (`M034-S04-T04-PLAN.md`: `wiki
+seed` in Python on T02's core and T03's merges; every bash seed golden passes unchanged;
+`wiki` drops `lib/seed.sh` and jq; record first: extract on a JSON list, help anywhere).
+3/5 tasks done in slice; slices S01–S03 are complete (3/6).
+
+T03 closed (`M034-S04-T03-SUMMARY.md`): the special merges run in Python
+(`union_list`, `merge_registry`, `env_missing` / `env_appended`). They are held to 22 bash
+goldens, and copies of lxw's five configs give the same files and reports.
 
 T01 closed (`M034-S04-T01-SUMMARY.md`). The bash seed is recorded on 13 more cases, 19 seed
 goldens. They were recorded after two releases of bash-first fixes found by the recording:
