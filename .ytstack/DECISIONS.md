@@ -2517,3 +2517,34 @@ command it hangs off, so the menu cannot offer what the dispatcher would refuse.
 - `compile --all` is browsable as well as on `C`.
 - The fuzzy list holds each entry once.
 - The menu's flush entry is gone: it only ever printed `wiki flush`'s usage.
+
+## 2026-10-16: The collector registry is a lazy table; `--list` still imports every collector (M034-S06-T03, exit criterion 6 amended)
+
+**Context:** `collectors/__init__.py` imported all 14 collector modules so their `@register`
+decorators ran. The backlog measured 0.25 s per collector verb for that (2026-10-14).
+Exit criterion 6 asked for a name → module table, with "`wiki collect --list` imports no
+collector module".
+
+**Measured before deciding (2026-10-16):** `import collectors` took 0.07 s, of which
+`collectors.base` + `core.config` were 0.067 s; the 14 modules added ~10 ms. And `--list`
+cannot avoid the modules. Its JSON, the desktop's `collect --list --json`, shows each
+collector's `configured`, which is the collector's own `is_configured()`. That probe reads
+the module's account resolution, token paths and constants.
+
+**Chose:** `collectors.MODULES` (SPEC name → module, in the reporting order). Importing the
+package imports no collector. `get_collector(name)` imports that module alone, and
+`all_collectors()` imports them all in table order. Both properties are tested in a child
+interpreter. A test also refuses a module that `@register`s without a table row. After:
+`import collectors` 0.014 s, `all_collectors()` 0.066 s for 14.
+
+**Rejected:**
+- *A probe layer, so `--list` imports nothing:* each collector's `is_configured()`, with the
+  helpers it reads, would move into a light module. That means two homes for one judgment,
+  across 14 modules, to save ~50 ms on a listing the desktop calls on demand.
+- *Dropping the table, since the cost is gone:* the eager import also forced the by-path
+  entry scripts, because `python -m collectors.<x>` imported the module twice. The table
+  removes that cause, which S06-T04's `collect <name> -- <flags>` builds on.
+
+**Consequence:** the criterion's parenthetical is amended in M034-CONTEXT, with the
+measurement. `preprocessors/` and `producers/` keep the eager shape; their cost was never
+the issue.

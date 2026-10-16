@@ -93,6 +93,13 @@ the TUI carry only what their readers use.
 6. **Collectors.** A name → module table registers collectors lazily (`wiki collect --list`
    imports no collector module). `wiki collect <name> -- <flags>` passes flags through, and
    the three by-path entry scripts are deleted.
+   - *Amended 2026-10-16 (S06-T03), with the measurement.* Importing the package imports no
+     collector module, and `wiki collect <name>` imports only its own; both are tested.
+     `--list` still imports every collector: the desktop's `collect --list --json` shows each
+     one's `configured`, which is the collector's own `is_configured()`.
+   - The criterion's premise, 0.25 s per collector verb (backlog, 2026-10-14), had shrunk to
+     0.07 s for `import collectors`. Now it is 0.014 s; `all_collectors()` takes 0.066 s for
+     14. DECISIONS 2026-10-16 "The collector registry is a lazy table".
 7. **Surfaces cut.** `README.md` ≤ 300 lines and `AGENTS.md` ≤ 250, each section kept for a
    named reader.
 8. **Operator path proven.** On a scratch vault, `wiki update` goes from 0.7.3 to the M034

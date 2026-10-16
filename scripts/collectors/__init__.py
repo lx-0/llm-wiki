@@ -1,8 +1,10 @@
 """Collectors — substrate-shaped raw/ writers.
 
-Importing this package triggers `@register` for every Collector
-subclass in submodules listed below. New Collector? Add a submodule
-and import it here.
+`MODULES` names every collector and the module that defines it. Importing this package
+imports none of them: `get_collector(name)` imports that collector's module on first use, and
+its `@register` fills the registry; `all_collectors()` imports them all, in this table's order
+(M034-S06-T03). New Collector? Add a submodule and a row here —
+`tests/test_collector_registry.py` refuses a module that `@register`s without one.
 """
 
 from collectors.base import (
@@ -15,34 +17,30 @@ from collectors.base import (
     register,
 )
 
-# Trigger @register side-effects. Import order = registration order = the order
-# `all_collectors()` / `wiki collect --list` / piggyback discovery report them in.
-# The sorter is switched off for this block — alphabetising it would change
-# that order (the action comment must stand alone on its line).
-# Note: calendar_collector.py is named with a `_collector` suffix to avoid
-# shadowing the stdlib `calendar` module — `http.cookiejar` does
-# `from calendar import timegm`, and `scripts/collectors/` sits on sys.path
-# when `cli.py` runs directly. Same fix pattern as email_collector.py.
-# capture_collector.py uses the `_collector` suffix (same defensive naming as
-# calendar_collector / email_collector). The SPEC name stays clean ("capture").
-# isort: off
-from collectors import calendar_collector
-from collectors import email_collector
-from collectors import folder_index
-from collectors import gmeet
-from collectors import health
-from collectors import jamie
-from collectors import wispr
-from collectors import scan_browser
-from collectors import scan_screenshots
-from collectors import scan_tabs
-from collectors import scan_youtube
-from collectors import pictures
-from collectors import voice
-from collectors import capture_collector
-# isort: on
+# SPEC name → module. The order is the order `all_collectors()`, `wiki collect --list` and
+# piggyback discovery report them in.
+# calendar_collector.py, email_collector.py and capture_collector.py carry a `_collector`
+# suffix so no module shadows a stdlib name (`http.cookiejar` does `from calendar import
+# timegm`); the SPEC names stay clean.
+MODULES: dict[str, str] = {
+    "calendar": "collectors.calendar_collector",
+    "email": "collectors.email_collector",
+    "folder-index": "collectors.folder_index",
+    "gmeet": "collectors.gmeet",
+    "health": "collectors.health",
+    "jamie": "collectors.jamie",
+    "wispr": "collectors.wispr",
+    "browser": "collectors.scan_browser",
+    "screenshots": "collectors.scan_screenshots",
+    "tabs": "collectors.scan_tabs",
+    "youtube": "collectors.scan_youtube",
+    "pictures": "collectors.pictures",
+    "voice": "collectors.voice",
+    "capture": "collectors.capture_collector",
+}
 
 __all__ = [
+    "MODULES",
     "Collector",
     "CollectorSpec",
     "RunResult",

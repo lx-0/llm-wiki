@@ -1,7 +1,14 @@
 # Lazy collector registration (M034 candidate, surfaced in M033-S02)
 
-**Status:** candidate; decide in M034 together with `collect-flags-one-verb.md`. Recorded
-2026-10-14 (M033-S02-T05 / T06).
+**Status:** collectors **shipped** in M034-S06-T03 (`collectors.MODULES`, DECISIONS
+2026-10-16 "The collector registry is a lazy table").
+- The cost below had shrunk to ~10 ms by then. `import collectors` is 0.014 s after.
+- `--list` still imports every collector, because the desktop shows each one's
+  `configured`.
+- Left: `preprocessors/` and `producers/` keep the eager shape. Their cost is small, so
+  that is low priority, for the milestone-close fan-out to decide.
+
+Recorded 2026-10-14 (M033-S02-T05 / T06).
 
 **Today:** `collectors/__init__.py` imports every collector module so the `@register`
 decorators run — the Registry is populated by package import. Consequences: (1) every

@@ -13,6 +13,7 @@ The Registry is consumed by:
 
 from __future__ import annotations
 
+import importlib
 import logging
 import shutil
 from collections.abc import Callable, Sequence
@@ -117,8 +118,9 @@ def register(cls: type[Collector]) -> type[Collector]:
             def is_configured(self): ...
             def run(self, *, dry_run=False, incremental=False): ...
 
-    Importing the module that defines the class triggers registration.
-    `collectors/__init__.py` imports each submodule for this reason.
+    Importing the module that defines the class triggers registration. The package imports
+    a collector's module when that collector is first asked for (`collectors.MODULES`,
+    M034-S06-T03), not on package import.
     """
     if not hasattr(cls, "SPEC"):
         raise TypeError(
@@ -128,10 +130,10 @@ def register(cls: type[Collector]) -> type[Collector]:
     spec = cls.SPEC  # type: ignore[attr-defined]
     if spec.name in _COLLECTORS:
         existing = _COLLECTORS[spec.name]
-        # A Collector module run as `__main__` gets re-imported as
-        # `collectors.<name>` by the package __init__'s auto-import — same
-        # SPEC.name appears twice with classes of the same qualname. Treat
-        # same-class re-registration as a no-op; only flag genuine collisions.
+        # A Collector module run as `__main__` gets imported a second time as
+        # `collectors.<name>` when its collector is asked for — same SPEC.name
+        # twice, classes of the same qualname. Treat same-class re-registration
+        # as a no-op; only flag genuine collisions.
         if existing.__qualname__ == cls.__qualname__:
             return cls
         raise ValueError(
@@ -142,12 +144,34 @@ def register(cls: type[Collector]) -> type[Collector]:
     return cls
 
 
-def all_collectors() -> list[Collector]:
-    """Yield instantiated collectors (one per registered class).
+def _load(name: str) -> type[Collector] | None:
+    """The class registered as ``name``. Its module (`collectors.MODULES`) is imported on
+    first use and its `@register` fills the registry. ``None`` for a name the table lacks;
+    a module that registers no collector of that name is the table and the code disagreeing,
+    and raises."""
+    from collectors import MODULES  # the package's table; the package imports this module
 
-    Used by `wiki collect --list` and `wiki collect <name>` dispatch.
+    module = MODULES.get(name)
+    if module is None:
+        return None
+    importlib.import_module(module)
+    cls = _COLLECTORS.get(name)
+    if cls is None:
+        raise ValueError(
+            f"{module} registers no collector named {name!r} "
+            "(collectors.MODULES and the module disagree)"
+        )
+    return cls
+
+
+def all_collectors() -> list[Collector]:
+    """Every collector, instantiated, in the table's order — importing each module.
+
+    Used by `wiki collect --list` (each one's `is_configured()`) and piggyback discovery.
     """
-    return [cls() for cls in _COLLECTORS.values()]
+    from collectors import MODULES
+
+    return [cls() for cls in (_load(name) for name in MODULES) if cls is not None]
 
 
 def piggyback_collectors() -> list[Collector]:
@@ -160,8 +184,8 @@ def piggyback_collectors() -> list[Collector]:
 
 
 def get_collector(name: str) -> Collector | None:
-    """Resolve a collector by SPEC.name. Returns None if not registered."""
-    cls = _COLLECTORS.get(name)
+    """Resolve a collector by SPEC.name, importing its module alone. None if unknown."""
+    cls = _load(name)
     return cls() if cls is not None else None
 
 
