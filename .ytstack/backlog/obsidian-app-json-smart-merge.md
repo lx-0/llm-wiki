@@ -5,6 +5,11 @@ surfaced: 2026-05-16
 size: XS
 ---
 
+> **Since M034-S04 the seed is Python** (`lib/seed.sh` is gone). Read the bash below as its
+> port: the loop is `scripts/core/seed.py:walk`, app.json is an overlay-managed config there
+> (`Seeder.overlay`, template ⊕ `.wiki/custom/` overlay — which already covers most of this
+> item), and a merge like `_merge_community_plugins` is now `core.seed.union_list`.
+
 ## Problem
 
 `lib/seed.sh` (around line 268) loops over `templates/.obsidian/*.json` and

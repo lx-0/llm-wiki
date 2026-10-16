@@ -1,11 +1,11 @@
-"""The seed's special merges (M034-S04-T03), pure in `core.seed`, held to the bash they replace.
+"""The seed's special merges (M034-S04-T03), pure in `core.seed`, held to the bash they replaced.
 
-Each case runs the `lib/seed.sh` merge on a copy of its fixture through a driver that
-sources the library: `_merge_list_union`, `_merge_registry` (its agent entries stubbed to the
-case's), `_merge_env_example`. The record is what the merge reports, from the same jq the
-function runs, and the file as it left it, or `(unchanged)`. It is kept under
-tests/golden/seed/merge-*.txt (`--snapshot-update`), and Python must reproduce it. The bash
-half goes with lib/seed.sh in T05; the goldens stay.
+Each case ran the `lib/seed.sh` merge on a copy of its fixture through a driver that sourced
+the library: `_merge_list_union`, `_merge_registry` (its agent entries stubbed to the
+case's), `_merge_env_example`. The record is what the merge reported, from the same jq the
+function ran, and the file as it left it, or `(unchanged)`. It was kept under
+tests/golden/seed/merge-*.txt before the bash was deleted (M034-S04-T05), and Python must
+reproduce it.
 
 The messages are not recorded here; `wiki seed`'s goldens hold them (tests/golden/bash/).
 """
@@ -13,7 +13,6 @@ The messages are not recorded here; `wiki seed`'s goldens hold them (tests/golde
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -21,7 +20,7 @@ import pytest
 from core import jqjson, seed
 from dashboard import agent_buttons
 
-from ._oracle import REPO_ROOT, assert_matches_golden
+from ._oracle import REPO_ROOT
 
 GOLDEN = Path(__file__).resolve().parent / "golden" / "seed"
 TEMPLATES = REPO_ROOT / "templates"
@@ -30,35 +29,6 @@ PLUGINS = OBSIDIAN / "plugins"
 SHELL = PLUGINS / "obsidian-shellcommands" / "data.json"
 META_BIND = PLUGINS / "obsidian-meta-bind-plugin" / "data.json"
 ENV = TEMPLATES / ".claude" / ".env.example"
-
-_DRIVER = r"""
-ok() { :; }; info() { :; }
-warn() {
-  case "$*" in
-    *"is not valid JSON"*) echo "trouble: json" ;;
-    *"is not in the shape"*) echo "trouble: shape" ;;
-    *) echo "warn: $*" ;;
-  esac
-}
-source "$1"; shift
-case "$1" in
-  list)
-    adding="$(jq -r --arg key "$4" --slurpfile e "$2" "$_LIST_UNION_JQ"' (($e[0] | l) - l) | join(", ")' "$3" 2>/dev/null)" \
-      && echo "reported: $adding"
-    _merge_list_union "$2" "$3" "label" "$4" "" 0 ;;
-  registry)
-    generated="$5"
-    _agent_entries() { cat "$generated"; }
-    engine="$(jq --arg key "$4" --argjson gen "$(cat "$5")" '.[$key] + $gen' "$2")"
-    if out="$(jq --arg key "$4" --argjson eng "$engine" "$_REGISTRY_MERGE_JQ" "$3" 2>/dev/null)"; then
-      echo "added: $(jq -r '.added | join(", ")' <<<"$out")"
-      echo "updated: $(jq -r '.updated | join(", ")' <<<"$out")"
-    fi
-    _merge_registry "$2" "$3" "label" "$4" "unused" "unused" 0 ;;
-  env)
-    _merge_env_example "$2" "$3" 0 0 ;;
-esac
-"""
 
 GENERATED = [
     {"id": "agent-a", "alias": "Wiki: agent a", "icon": "lucide-bot"},
@@ -184,27 +154,9 @@ def _vault_file(tmp_path: Path, template: Path, before: object) -> Path:
     return path
 
 
-def _bash(*args: object) -> str:
-    run = subprocess.run(
-        ["bash", "-c", _DRIVER, "driver", str(REPO_ROOT / "lib" / "seed.sh"), *map(str, args)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert run.returncode == 0, run.stderr
-    return run.stdout
-
-
-def _record(report: str, path: Path, before: bytes) -> str:
-    after = path.read_bytes()
-    file = "(unchanged)\n" if after == before else after.decode("utf-8")
-    return report + "--- file ---\n" + file
-
-
 def _golden(name: str) -> str:
     path = GOLDEN / name
-    assert path.exists(), f"{name} not recorded — run tests/test_seed_merges.py --snapshot-update"
+    assert path.exists(), f"{name}: the bash's record is missing (tests/golden/seed/)"
     return path.read_text(encoding="utf-8")
 
 
@@ -212,39 +164,7 @@ def _trouble(exc: Exception) -> str:
     return "trouble: json\n" if isinstance(exc, json.JSONDecodeError) else "trouble: shape\n"
 
 
-# ── the bash, recorded (deleted with lib/seed.sh in T05) ──────────────────────
-
-
-@pytest.mark.parametrize("name", sorted(LISTS))
-def test_bash_list_union_is_recorded(request, tmp_path: Path, name: str) -> None:
-    template, key, before = LISTS[name]
-    path = _vault_file(tmp_path, template, before)
-    original = path.read_bytes()
-    report = _bash("list", template, path, key)
-    assert_matches_golden(request, f"merge-{name}.txt", _record(report, path, original), GOLDEN)
-
-
-@pytest.mark.parametrize("name", sorted(REGISTRIES))
-def test_bash_registry_merge_is_recorded(request, tmp_path: Path, name: str) -> None:
-    template, key, before = REGISTRIES[name]
-    path = _vault_file(tmp_path, template, before)
-    generated = tmp_path / "generated.json"
-    generated.write_text(json.dumps(GENERATED), encoding="utf-8")
-    original = path.read_bytes()
-    report = _bash("registry", template, path, key, generated)
-    assert_matches_golden(request, f"merge-{name}.txt", _record(report, path, original), GOLDEN)
-
-
-@pytest.mark.parametrize("name", sorted(ENVS))
-def test_bash_env_append_is_recorded(request, tmp_path: Path, name: str) -> None:
-    path = tmp_path / ".env.example"
-    path.write_text(ENVS[name](ENV.read_text(encoding="utf-8")), encoding="utf-8")
-    original = path.read_bytes()
-    report = _bash("env", ENV, path)
-    assert_matches_golden(request, f"merge-{name}.txt", _record(report, path, original), GOLDEN)
-
-
-# ── Python, held to the record ─────────────────────────────────────────────────
+# ── Python, held to the bash's record ─────────────────────────────────────────
 
 
 @pytest.mark.parametrize("name", sorted(LISTS))

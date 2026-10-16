@@ -7,7 +7,7 @@
 #   ./install.sh /path/to/vault           # local checkout
 #
 # Effects:
-#   - Verifies prerequisites (git, jq, uv, bash 4+)
+#   - Verifies prerequisites (git, uv, bash 4+)
 #   - Refuses to overwrite an existing .wiki/ (use `wiki update` instead)
 #   - Clones the repo into <target>/.wiki/
 #   - Seeds <target>/.wiki/config.yaml from config.example.yaml
@@ -40,7 +40,7 @@ if [[ -e "$DEST" ]]; then
 fi
 
 missing=()
-for cmd in git jq uv bash; do
+for cmd in git uv bash; do
   command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
 done
 if (( ${#missing[@]} > 0 )); then
@@ -48,7 +48,6 @@ if (( ${#missing[@]} > 0 )); then
   cat >&2 <<EOF
 Install hints:
   ${B}git${N}   pre-installed on most systems
-  ${B}jq${N}    brew install jq          | apt install jq
   ${B}uv${N}    curl -LsSf https://astral.sh/uv/install.sh | sh
   ${B}bash${N}  brew install bash        (macOS ships an old 3.x — bash 4+ recommended)
 EOF
@@ -89,15 +88,12 @@ if [[ -f "$DEST/config.example.yaml" && ! -f "$DEST/config.yaml" ]]; then
   ok "config.yaml seeded from config.example.yaml"
 fi
 
-# ── Seed vault templates ─────────────────────────────────────────────
-# Delegates to lib/seed.sh — same code is reused by `wiki seed` for
-# in-place re-seeding on existing installs. When stdin is a TTY (or
-# /dev/tty is reachable, which covers curl|bash when run in a real
-# terminal), prompt once for keep / overwrite / abort. When non-TTY
-# (true headless), default to keep — matching the original contract.
+# ── Seed vault templates: the choice ─────────────────────────────────
+# The seeding itself is `wiki seed`, run once the engine's environment is
+# synced (below). When stdin is a TTY (or /dev/tty can be opened, which covers
+# curl|bash in a real terminal), ask once for keep / overwrite / abort. When
+# headless, keep — matching the original contract.
 info() { printf "ℹ %s\n" "$*"; }
-# shellcheck source=lib/seed.sh
-source "$DEST/lib/seed.sh"
 
 seed_force=0
 # Detect whether the operator already has any seedable files. If not, the
@@ -112,8 +108,11 @@ for probe in \
 done
 
 if (( has_existing )); then
-  # Reuse /dev/tty so curl|bash still gets an interactive prompt.
-  if [[ -t 0 ]] || [[ -r /dev/tty ]]; then
+  # Reuse /dev/tty so curl|bash still gets an interactive prompt. Open it to
+  # find out: `-r /dev/tty` only tests the permission, which holds without a
+  # controlling terminal too — the `read` then failed ("Device not
+  # configured") and `set -e` aborted a headless install over an existing vault.
+  if [[ -t 0 ]] || { : </dev/tty; } 2>/dev/null; then
     printf "\n%sExisting vault files detected at %s%s\n" "$Y" "$TARGET" "$N"
     printf "  ${B}k${N})eep existing — engine versions will NOT overwrite your edits ${D}(default)${N}\n"
     printf "  ${B}o${N})verwrite — replace template files with engine defaults ${D}(your edits in those files are lost)${N}\n"
@@ -133,8 +132,6 @@ if (( has_existing )); then
     info "non-interactive install — keeping existing files (rerun './.wiki/wiki seed --force' to overwrite)"
   fi
 fi
-
-seed_vault_templates "$TARGET" "$DEST" "$seed_force"
 
 # ── Wire skills into Claude Code ─────────────────────────────────────
 # Each engine skill at .wiki/skills/<name>/ is symlinked to
@@ -188,6 +185,17 @@ if uv sync --project "$DEST" --quiet 2>/dev/null; then
   ok "venv ready at $VENV_PATH"
 else
   warn "uv sync failed — run 'uv sync --project $DEST' manually before first use"
+fi
+
+# ── Seed vault templates ─────────────────────────────────────────────
+# `wiki seed` (scripts/seed_cli.py), now that the engine's environment exists. Its
+# vault guard wants .obsidian/ — the old bash seed created it silently, so a fresh
+# directory becomes a vault here, as before.
+mkdir -p "$TARGET/.obsidian"
+seed_args=(seed)
+[[ "$seed_force" == 1 ]] && seed_args+=(--force)
+if ! (cd "$TARGET" && "$DEST/wiki" "${seed_args[@]}"); then
+  warn "seeding failed — once the environment is ready, run: cd '$TARGET' && ./.wiki/wiki seed"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────

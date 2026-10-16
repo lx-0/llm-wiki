@@ -265,7 +265,7 @@ The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.ex
 | `<vault>/.obsidian/core-plugins.json` | `templates/.obsidian/` | Sensible defaults (daily-notes, properties, graph on; sync/publish off). |
 | `<vault>/.claude/skills/use-llm-wiki` | symlink to `.wiki/skills/use-llm-wiki` | The one bundled engine-side skill — lets agents query, contribute, or diagnose this wiki via the `wiki` CLI from any project. *Global-eligible*: `wiki skills install --global` links it into `~/.claude/skills/` so agents anywhere can reach it. The other operator skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `vault-health-check`, `vault-triage`) ship via the Claude Code plugin marketplace `yesterday-public-plugins`, not as repo-bundled skills. |
 
-**Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
+**Prerequisites:** `bash` ≥ 4, `git`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
 
 After install:
 
@@ -369,7 +369,7 @@ reference — every subcommand, every config key, every hook target — lives in
 
 ## For contributors
 
-Engine internals (file-by-file tree, the bash/python/jq split rationale) live in [docs/engine-layout.md](docs/engine-layout.md). Development conventions — how to add an agent target, a tunable, or a prompt; style + side-effect rules — live in [AGENTS.md](AGENTS.md).
+Engine internals (file-by-file tree, the bash/python split rationale) live in [docs/engine-layout.md](docs/engine-layout.md). Development conventions — how to add an agent target, a tunable, or a prompt; style + side-effect rules — live in [AGENTS.md](AGENTS.md).
 
 <!-- ## Star history
 

@@ -1,10 +1,11 @@
-"""The seed core (M034-S04-T02): `core.seed` and `core.jqjson`, held to the bash they replace.
+"""The seed core (M034-S04-T02): `core.seed` and `core.jqjson`, held to the bash they replaced.
 
-Each case's input runs through the `lib/seed.sh` function it replaces, composed the way the
-seed composes it: `_apply_overlay` as `printf '%s\\n' "$(…)"` (what lands in the vault),
-`_compute_overlay` with `--extract-custom`'s override count, `_json_canon`. The output is
-recorded under tests/golden/seed/ (`--snapshot-update`), and Python must produce it byte for
-byte. The bash-running tests go with lib/seed.sh in T05; the goldens stay.
+Each case's input went through the `lib/seed.sh` function Python replaces, composed the way
+the seed composed it: `_apply_overlay` as `printf '%s\\n' "$(…)"` (what landed in the vault),
+`_compute_overlay` with `--extract-custom`'s override count, `_json_canon`. The output was
+recorded under tests/golden/seed/ before the bash was deleted (M034-S04-T05), and Python
+must produce it byte for byte. An intended change re-records the golden from Python and says
+why in its commit.
 
 jq 1.7 keeps a number's literal (`1.50`, `1E+3`, `-0`), so `jqjson` reads numbers as
 `Decimal` — the same General Decimal Arithmetic spec — and writes them back as read.
@@ -14,7 +15,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from decimal import Decimal
 from pathlib import Path
 
@@ -22,25 +22,12 @@ import pytest
 
 from core import jqjson, seed
 
-from ._oracle import REPO_ROOT, assert_matches_golden
+from ._oracle import REPO_ROOT
 
 GOLDEN = Path(__file__).resolve().parent / "golden" / "seed"
 TEMPLATES = REPO_ROOT / "templates"
 GRAPH = TEMPLATES / ".obsidian" / "graph.json"
 QUICKADD = TEMPLATES / ".obsidian" / "plugins" / "quickadd" / "data.json"
-
-# The seed's own composition of each function: the derived file as `printf '%s\n'` writes
-# it, the extracted overlay with the count `--extract-custom` reports, the canonical form.
-_DRIVER = r"""
-ok() { :; }; info() { :; }; warn() { :; }; err() { :; }
-source "$1"; shift
-case "$1" in
-  apply)   desired="$(_apply_overlay "$2" "$3")"; printf '%s\n' "$desired" ;;
-  compute) delta="$(_compute_overlay "$2" "$3")"; printf '%s\n' "$delta"
-           printf 'overrides: %s\n' "$(printf '%s' "$delta" | jq "$_LEAF_PATHS_JQ"' [leaf_paths] | length')" ;;
-  canon)   _json_canon "$2" ;;
-esac
-"""
 
 # name → (base, overlay); a base that is a Path is a real template, overlay None = no file
 APPLY: dict[str, tuple[object, object]] = {
@@ -107,46 +94,13 @@ def _inputs(tmp_path: Path, first: object, second: object) -> tuple[Path, Path]:
     return one, two
 
 
-def _bash(*args: object) -> str:
-    run = subprocess.run(
-        ["bash", "-c", _DRIVER, "driver", str(REPO_ROOT / "lib" / "seed.sh"), *map(str, args)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert run.returncode == 0, run.stderr
-    return run.stdout
-
-
 def _golden(name: str) -> str:
     path = GOLDEN / name
-    assert path.exists(), f"{name} not recorded — run tests/test_seed_core.py --snapshot-update"
+    assert path.exists(), f"{name}: the bash's record is missing (tests/golden/seed/)"
     return path.read_text(encoding="utf-8")
 
 
-# ── the bash, recorded (deleted with lib/seed.sh in T05) ──────────────────────
-
-
-@pytest.mark.parametrize("name", sorted(APPLY))
-def test_bash_apply_overlay_is_recorded(request, tmp_path: Path, name: str) -> None:
-    base, overlay = _inputs(tmp_path, *APPLY[name])
-    assert_matches_golden(request, f"apply-{name}.json", _bash("apply", base, overlay), GOLDEN)
-
-
-@pytest.mark.parametrize("name", sorted(COMPUTE))
-def test_bash_compute_overlay_is_recorded(request, tmp_path: Path, name: str) -> None:
-    base, current = _inputs(tmp_path, *COMPUTE[name])
-    assert_matches_golden(request, f"compute-{name}.txt", _bash("compute", base, current), GOLDEN)
-
-
-@pytest.mark.parametrize("name", sorted(CANON))
-def test_bash_canonical_form_is_recorded(request, tmp_path: Path, name: str) -> None:
-    source = _write(tmp_path / "in.json", CANON[name])
-    assert_matches_golden(request, f"canon-{name}.json", _bash("canon", source), GOLDEN)
-
-
-# ── Python, held to the record ─────────────────────────────────────────────────
+# ── Python, held to the bash's record ─────────────────────────────────────────
 
 
 @pytest.mark.parametrize("name", sorted(APPLY))

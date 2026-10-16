@@ -18,6 +18,26 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.26] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Changed
+
+- **jq is no longer needed at all.** The installer seeds the vault with `wiki seed` once the
+  engine's Python environment exists, and the bash seed library is gone.
+  - A directory without `.obsidian/` still becomes a vault on install, as before.
+  - A seed that fails (for example after a failed environment sync) warns with the command
+    to rerun instead of aborting the install.
+
+### Fixed
+
+- **A headless install over an existing vault no longer aborts.** The installer only checked
+  that `/dev/tty` was readable, which holds without a terminal too. The keep / overwrite
+  prompt then failed with "Device not configured", and the install stopped. The installer
+  now tries to open the terminal. Without one, it keeps your files, as it always said it
+  would.
+
 ## [0.7.25] — 2026-10-16
 
 **For your vault:** nothing to do.

@@ -1,5 +1,6 @@
-"""The seed's pure core (M034-S04-T02) — what `lib/seed.sh` walks and how it derives a config,
-held to output the bash recorded (`tests/golden/seed/`, `tests/test_seed_core.py`).
+"""The seed's pure core (M034-S04-T02) — what `wiki seed` walks and how it derives a config,
+held to the output the bash `lib/seed.sh` recorded before it was deleted
+(`tests/golden/seed/`, `tests/test_seed_core.py`).
 
 - `walk` lists the files `wiki seed` puts into a vault, in the bash's order, each with the
   way it is seeded. Only the listed templates are seeded: the `_dashboard-*.md` caches are

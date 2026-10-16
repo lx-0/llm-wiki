@@ -2,8 +2,9 @@
 
 The command around `core.seed`: the argv, the banner, a status line per file in the bash's
 own words, the writes, `--extract-custom`, the dashboard's agent-button region, and the
-dashboards refresh after a writing run. The bash `cmd_seed` / `lib/seed.sh` it replaces is
-recorded in tests/golden/bash/seed-*.txt; every message, file and exit code there holds.
+dashboards refresh after a writing run. The bash `cmd_seed` / `lib/seed.sh` it replaced
+(deleted in M034-S04-T05) is recorded in tests/golden/bash/seed-*.txt; every message, file
+and exit code there holds.
 """
 
 from __future__ import annotations

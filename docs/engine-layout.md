@@ -25,9 +25,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── config.yaml                ← gitignored ─┘
 ├── pyproject.toml + uv.lock
 ├── lib/
-│   ├── common.sh              ← paths, the engine-environment rule, output helpers, shell_quote / sync_hint, backup
-│   ├── ui.sh                  ← interactive prompts: confirm for update
-│   └── seed.sh                ← install.sh's template seeding until M034-S04-T05 (`wiki seed` itself is scripts/seed_cli.py)
+│   ├── common.sh              ← the engine-environment rule (wiki_venv_dir), output helpers, shell_quote / sync_hint, require_cmd
+│   └── ui.sh                  ← interactive prompts: confirm for update
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
@@ -308,7 +307,8 @@ A module under `scripts/` stays at or under 1,000 lines; one that is larger is l
 - **python** for everything else, JSON included. The agent-config and seed merges were jq
   until M034; `core/jqjson.py` now reads, compares and writes JSON the way jq 1.7 did, held
   byte for byte to the bash's recorded output (`tests/golden/agents/`, `tests/golden/seed/`).
-  `install.sh` still sources `lib/seed.sh` (and needs jq) until M034-S04-T05.
+  Nothing needs jq any more; `install.sh` seeds through `wiki seed` once the environment
+  exists.
 
 ## Where to go next
 

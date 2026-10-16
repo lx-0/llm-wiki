@@ -1,7 +1,7 @@
 """Discovery + auto-wiring helpers for agent-task Dashboard buttons.
 
 Walks `prompts/agents/*.md` for specs that declare a `button:` block, and
-emits the data `lib/seed.sh` wires into the vault:
+gives `wiki seed` (scripts/seed_cli.py, in-process) the data it wires into the vault:
 
   1. a Shell commands entry per button, merged by id into the `shell_commands`
      of `.obsidian/plugins/obsidian-shellcommands/data.json`
@@ -12,17 +12,12 @@ emits the data `lib/seed.sh` wires into the vault:
 
 The engine templates carry the engine's own entries and none of these: the
 generator is the one source of the agent entries (`tests/test_agent_buttons.py`
-holds the templates to that).
-
-Usage from bash (the lines lib/seed.sh spells):
-    PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python -m dashboard.agent_buttons shell-commands       # JSON list for the shell-commands merge
-    PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python -m dashboard.agent_buttons meta-bind-templates  # JSON list for the meta-bind merge
-    PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python -m dashboard.agent_buttons update-dashboard <dashboard.md>
+holds the templates to that). The bash seed ran this module as a CLI through
+`uv run`; with the seed in Python (M034-S04-T04) that entry point went.
 """
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -149,35 +144,3 @@ def update_dashboard(dashboard_path: Path) -> bool:
         dashboard_path.write_text(new_text, encoding="utf-8")
         return True
     return False
-
-
-def main() -> int:
-    modes = {"shell-commands", "meta-bind-templates", "update-dashboard"}
-    if len(sys.argv) < 2 or sys.argv[1] not in modes:
-        print(
-            "usage: scripts/dashboard/agent_buttons.py {shell-commands | meta-bind-templates | update-dashboard <path>}",
-            file=sys.stderr,
-        )
-        return 2
-    mode = sys.argv[1]
-    if mode == "shell-commands":
-        print(json.dumps(shell_commands_entries(), indent=2, ensure_ascii=False))
-    elif mode == "meta-bind-templates":
-        print(json.dumps(meta_bind_templates(), indent=2, ensure_ascii=False))
-    elif mode == "update-dashboard":
-        if len(sys.argv) != 3:
-            print(
-                "usage: scripts/dashboard/agent_buttons.py update-dashboard <dashboard.md>",
-                file=sys.stderr,
-            )
-            return 2
-        dashboard = Path(sys.argv[2])
-        if not has_region(dashboard.read_text(encoding="utf-8")):
-            print("no-region")
-        else:
-            print("changed" if update_dashboard(dashboard) else "unchanged")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

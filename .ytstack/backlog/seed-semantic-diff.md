@@ -3,6 +3,10 @@
 **Triggered by:** vault drift audit 2026-05-13. `wiki seed --check` currently uses `cmp -s` (binary equality). For Obsidian-plugin-edited files this produces near-100% false-positives because Obsidian touches the JSON the moment it opens the vault.
 **Priority:** P2 — refinement, not blocking. Engine works; audit just has noise.
 
+> **Since M034-S04 the seed is Python** (`lib/seed.sh` is gone): `_seed_file` is
+> `scripts/seed_cli.py:Seeder.copy` (still byte for byte), and the JSON configs compare
+> canonically (`core.jqjson.canonical`) in `Seeder.overlay` and the merges.
+
 ## Problem
 
 `_seed_file` in `lib/seed.sh` compares engine template vs vault file byte-for-byte. For plain-text Markdown templates (README, AGENTS) that's fine. For `.obsidian/*.json` / `.obsidian/plugins/*/data.json`, the comparison is misleading:
