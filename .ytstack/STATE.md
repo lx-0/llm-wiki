@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T02:37:17+02:00
+last_updated: 2026-10-16T02:41:19+02:00
 current_milestone: M034
 active_slice: S05
-active_task: none
+active_task: T01
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,10 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 — slice S04 complete. Next slice: S05 (update + the last bash). The
-reassessment after S04 came out **A**: the slice order holds, and S04's lessons are in S05's
-plan notes. Slices S01–S04 are complete (4/6). Next: `/ytstack:plan-task` for S05-T01, the
-update oracle.
+**Status:** M034 / S05 / T01 planned — ready to execute (`M034-S05-T01-PLAN.md`: the bash
+`wiki update` recorded first, from fixture vaults cloned from a local `file://` origin one
+commit ahead, plus the stash path through a pty; fix first). Slices S01–S04 are complete
+(4/6); the reassessment after S04 came out **A**, and S04's lessons are in S05's plan notes.
 
 T05 closed (`M034-S04-T05-SUMMARY.md`): install.sh seeds through `wiki seed` after its venv
 sync, `lib/seed.sh` is deleted, and nothing needs jq any more (0.7.26).
