@@ -136,7 +136,7 @@ def test_a_vault_without_a_venv_syncs_one_first(hop: dict[str, Path]) -> None:
 def test_a_cloud_synced_vault_runs_the_venv_under_home(
     tmp_path: Path, engine_template: Path
 ) -> None:
-    # lib/common.sh's one rule: a vault in iCloud Drive keeps its venv at ~/.venvs/<vault>-wiki
+    # the bootstrap's cloud rule: a vault in iCloud Drive keeps its venv at ~/.venvs/<vault>-wiki
     env = _env(tmp_path / "Library" / "Mobile Documents", tmp_path, engine_template)
     venv = _stub_venv(env["home"] / ".venvs" / f"{env['vault'].name}-wiki")
 

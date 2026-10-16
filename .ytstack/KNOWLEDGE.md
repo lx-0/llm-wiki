@@ -3097,7 +3097,7 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
     dependency fix rebuilt `.wiki/.venv` inside the cloud vault and left the broken
     environment as it was.
 
-  The helpers: `lib/common.sh:shell_quote` / `sync_hint`; `core.agents.shell_quote`, which
+  The helpers: `lib/common.sh:shell_quote` / `sync_hint` (in `wiki` since M034-S05-T05); `core.agents.shell_quote`, which
   always quotes so hook commands stay byte-identical to earlier installs; `shlex.quote` for
   Python hints. The tests run the hook under `sh -c` with a stub `uv` and split each hint
   with `shlex.split` back into its argv. The old substring assert on the hint text was green
@@ -3438,7 +3438,7 @@ So the migration built the target and placed the symlink, and iCloud Drive's rec
 
 ### Fix (0.5.4, same day)
 
-No symlink. The engine decides where its environment is: `lib/common.sh:wiki_venv_dir` — vault under `~/Library/Mobile Documents/` or `~/Library/CloudStorage/` → `~/.venvs/<vault>-wiki`, exported as `UV_PROJECT_ENVIRONMENT` by the `wiki` dispatcher, written literally into every agent hook command by `lib/agents.sh` (the agent spawns hooks with *its* env), asked by `install.sh`; Python reads only `sys.prefix`. `wiki doctor` guards both ends (`engine-cloud-eviction` on the running prefix, `hooks-installed` on the hook commands). The operator asked why not the platform app-data directory (`~/Library/Application Support`) — fair for an app, but this is a regenerable Python environment and `~/.venvs/<name>` was already there, so it stayed. Manual `uv run --project .wiki` on such a vault is now the one remaining way to recreate an in-vault `.venv`; the doctor reports it as stale within the day.
+No symlink. The engine decides where its environment is: `lib/common.sh:wiki_venv_dir` (since M034-S05-T05 in the bootstrap `wiki`) — vault under `~/Library/Mobile Documents/` or `~/Library/CloudStorage/` → `~/.venvs/<vault>-wiki`, exported as `UV_PROJECT_ENVIRONMENT` by the `wiki` dispatcher, written literally into every agent hook command by `lib/agents.sh` (the agent spawns hooks with *its* env), asked by `install.sh`; Python reads only `sys.prefix`. `wiki doctor` guards both ends (`engine-cloud-eviction` on the running prefix, `hooks-installed` on the hook commands). The operator asked why not the platform app-data directory (`~/Library/Application Support`) — fair for an app, but this is a regenerable Python environment and `~/.venvs/<name>` was already there, so it stayed. Manual `uv run --project .wiki` on such a vault is now the one remaining way to recreate an in-vault `.venv`; the doctor reports it as stale within the day.
 
 Live on lxw, 2026-09-17 13:15: `wiki update` 16 s (the run before, still on the in-vault env, sat 12 min in `git diff` materialising 2 024 evicted files — `brctl download <vault>/.wiki` is the unblock); Codex/Gemini/Cursor hooks rewritten with the path (Claude's `~/.claude/settings.json` is never edited from a running session — merged copy handed over via /tmp); one archived flush retried through `~/.venvs/lxw-wiki`: landed on the first attempt in 54 s, no crash report. The installer's array-replacing merge was found on the way (one foreign SessionStart hook per agent would have been dropped) and fixed in the same arc.
 

@@ -1,25 +1,18 @@
 #!/usr/bin/env bash
-# wiki — single entry-point CLI for the wiki/ system.
+# wiki — single entry point for the engine; a bootstrap and nothing else (M034).
 #
-# The command catalog is NOT maintained here. `scripts/cli_catalog.py` owns the
-# full table of subcommands (name, handler, banner, refresh-after; the per-command
-# help texts sit in `scripts/cli_help.py`) and is the single source of truth for
-# `wiki help`. The home menu keeps its own action table (`scripts/menu.py` +
-# `scripts/core/actions.py`) — folding the two is M034's. This bash layer only does
-# bootstrap (symlink resolution, vault guard, the engine's environment). Every
-# subcommand — bare `wiki`, help, menu, doctor, version, config, setup,
-# install-shortcut, hooks, skills, status, seed, update, the dream routing and the
-# OAuth aliases included — is delegated to `scripts/cli.py` in one hop,
-# which also owns the once-locked dashboard refresh and the OAuth bootstrap
-# (`wiki auth <service> <account-id>`).
+# Every command is Python: `scripts/cli.py` dispatches from the catalogue in
+# `scripts/cli_catalog.py` (help texts in `scripts/cli_help.py`), which is the single
+# source of truth for `wiki help`. This file does only what has to happen before Python
+# can run: find its own engine directory (through the `~/.local/bin/wiki` symlink), say
+# where the engine's Python environment lives, refuse a directory that is not a vault,
+# and hand over to cli.py in one hop. `tests/test_bash_budget.py` holds it to 150 lines,
+# with no library beside it.
 
 set -euo pipefail
 
-# Resolve symlinks so `wiki` invoked via ~/.local/bin/wiki (created by
-# `wiki install-shortcut`) still finds lib/* relative to the real script
-# location, not relative to the symlink path. macOS `readlink -f` lives
-# in coreutils (greadlink) and isn't guaranteed; use a portable Python
-# fallback via the script's own dirname loop.
+# Resolve symlinks so `wiki` invoked via ~/.local/bin/wiki (`wiki install-shortcut`) finds
+# the engine next to the real file, not next to the link. macOS has no `readlink -f`.
 _resolve_self() {
   local src="${BASH_SOURCE[0]}"
   while [ -L "$src" ]; do
@@ -35,17 +28,55 @@ WIKI_DIR="$(_resolve_self)"
 ROOT_DIR="$(cd "$WIKI_DIR/.." && pwd)"
 export WIKI_DIR ROOT_DIR
 
-# shellcheck source=lib/common.sh
-source "$WIKI_DIR/lib/common.sh"
+die() {
+  if [[ -t 2 ]]; then printf '\e[31m✗ %s\e[0m\n' "$*" >&2; else printf '✗ %s\n' "$*" >&2; fi
+  exit 1
+}
 
-require_cmd uv "needed to sync and run the engine's Python environment"
+command -v uv >/dev/null 2>&1 \
+  || die "uv not found (needed to sync and run the engine's Python environment). Install it and retry."
+
+# ── Where the engine's Python environment lives ──────────────────────
+# A vault in a cloud-synced folder (iCloud Drive, ~/Library/CloudStorage) must not run its
+# environment from there: the sync engine evicts file contents, and the kernel SIGKILLs a
+# mapped binary whose pages stop matching its signature (lxw 2026-09-17; a symlinked
+# .wiki/.venv is no fix either — KNOWLEDGE has the story). So such a vault's environment is
+# ~/.venvs/<vault>-wiki, exported for everything this process starts; the agent hook
+# commands carry it literally (core/agents.py), because the agent spawns them, not `wiki`.
+# An operator's own UV_PROJECT_ENVIRONMENT always wins; elsewhere uv's .wiki/.venv stays.
+# core/health/engine.py judges vaults by the same markers: tests/test_engine_env_location.py
+# holds both copies to one table of cases.
+if [[ -z "${UV_PROJECT_ENVIRONMENT:-}" ]]; then
+  case "$WIKI_DIR" in
+    */Library/Mobile\ Documents/*|*/Library/CloudStorage/*)
+      export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/$(basename "$ROOT_DIR")-wiki" ;;
+  esac
+fi
+
+# A path in a command some other shell runs (a hint the operator pastes) is single-quoted,
+# each ' written as '\'': bare '…' broke on "Alex's Vault", no quotes on `Mobile Documents`.
+# Pattern removal, not ${s//…/…}: bash 5.2's patsub_replacement reads that differently
+# from the macOS bash 3.2.
+shell_quote() {
+  local s="$1" out=""
+  while [[ "$s" == *\'* ]]; do
+    out+="${s%%\'*}'\\''"
+    s="${s#*\'}"
+  done
+  printf "'%s'" "$out$s"
+}
+
+# The `uv sync` an operator can paste. Their shell never had the export above, so the
+# environment is named; a bare `uv sync` would rebuild .wiki/.venv inside a cloud vault.
+sync_hint() {
+  printf "UV_PROJECT_ENVIRONMENT=%s uv sync --project %s" \
+    "$(shell_quote "${UV_PROJECT_ENVIRONMENT:-$WIKI_DIR/.venv}")" "$(shell_quote "$WIKI_DIR")"
+}
 
 # ── Vault guard ──────────────────────────────────────────────────────
-# Engine refuses to run outside an Obsidian vault. Without this, a bare
-# checkout of the engine repo gets treated as a vault by paths.py
-# (WIKI_DIR=<repo>, ROOT_DIR=<parent>) and `wiki <foo>` scribbles
-# logs/, state/, reports/, config.yaml into the engine source tree.
-# Marker: `.obsidian/` at ROOT_DIR — the canonical user-facing vault signal.
+# Outside an Obsidian vault, paths.py would take a bare engine checkout for one
+# (WIKI_DIR=<repo>, ROOT_DIR=<parent>) and write logs/, state/ and config.yaml into
+# the engine source tree. The marker is `.obsidian/` at ROOT_DIR.
 require_vault() {
   if [[ ! -d "$ROOT_DIR/.obsidian" ]]; then
     >&2 echo "wiki: $ROOT_DIR is not an Obsidian vault (no .obsidian/ directory)."
@@ -55,31 +86,21 @@ require_vault() {
   fi
 }
 
-# ── Subcommand dispatchers ───────────────────────────────────────────
-# `wiki status`, `wiki hooks` (M034-S03-T05), `wiki skills` (M034-S03-T06), `wiki seed`
-# (M034-S04-T04) and `wiki update` (M034-S05-T02 / T03) are Python: status_cli.py,
-# hooks_cli.py, skills_cli.py, seed_cli.py, update_cli.py.
-
-
 _dispatch_python() {
-  # Delegate a Python-backed subcommand to the table-driven dispatcher, in one hop
-  # (DECISIONS 2026-10-15 "One hop"): `exec` the venv's Python straight into
-  # cli.py, so cli.py owns the process (banner, run, once-locked refresh) and its
-  # exit code reaches the caller, with no `uv run` parent costing ~57 ms per call.
-  # The venv is lib/common.sh's one rule: UV_PROJECT_ENVIRONMENT, else .wiki/.venv.
-  # A relative UV_PROJECT_ENVIRONMENT is uv's to resolve, so it stays on `uv run`.
+  # One hop (DECISIONS 2026-10-15): `exec` the venv's Python straight into cli.py, so
+  # cli.py owns the process and its exit code reaches the caller, with no `uv run` parent
+  # costing ~57 ms per call. A relative UV_PROJECT_ENVIRONMENT is uv's to resolve, so it
+  # stays on `uv run`.
   local venv="${UV_PROJECT_ENVIRONMENT:-$WIKI_DIR/.venv}"
   case "$venv" in
     /*) ;;
     *) exec uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli.py" "$@" ;;
   esac
-  # `uv run` also synced the venv whenever uv.lock / pyproject.toml changed (a pull
-  # outside `wiki update`, a hand edit). Kept: no venv yet, or either file newer than
-  # the last sync's stamp → `uv sync` first. `--inexact` is `uv run`'s sync (it never
-  # removes extra packages). A failed sync stops here, stamp untouched — and says so: a
-  # uv that cannot run at all (an asdf shim under a foreign HOME exits 126) prints nothing
-  # of its own. The hint (lib/common.sh's sync_hint) names the venv, so following it never
-  # recreates .wiki/.venv inside a cloud-synced vault.
+  # What `uv run` did besides: sync whenever uv.lock / pyproject.toml changed (a pull
+  # outside `wiki update`, a hand edit). Kept: no venv yet, or either file newer than the
+  # last sync's stamp → `uv sync` first (`--inexact`, as `uv run` syncs). A failed sync
+  # stops here, stamp untouched, and says so: a uv that cannot run at all (an asdf shim
+  # under a foreign HOME exits 126) prints nothing of its own.
   local stamp="$venv/.wiki-synced"
   if [[ ! -x "$venv/bin/python" || "$WIKI_DIR/uv.lock" -nt "$stamp" \
         || "$WIKI_DIR/pyproject.toml" -nt "$stamp" ]]; then
@@ -96,18 +117,13 @@ _dispatch_python() {
 }
 
 # ── Entry point ──────────────────────────────────────────────────────
-# Guard before dispatch: every subcommand except help/version touches vault
-# state, so demand a vault. Help + version must work in a bare checkout.
+# Every command but help, version and install-shortcut touches vault state: demand a vault.
 case "${1:-}" in
   help|-h|--help|version|install-shortcut) ;;
   *) require_vault ;;
 esac
 
-# Bash keeps only the bootstrap. Every subcommand, `update` included since
-# M034-S05-T03, is delegated to scripts/cli.py, which is the single source of
-# truth for the command catalog (its routes and aliases included), the
-# once-locked dashboard refresh and the argv-safe OAuth bootstrap. Bare `wiki`
-# goes there too: cli.py opens the home screen when stdin and stdout are
-# terminals and prints help otherwise, so CI, pipes, hooks and cron never block
+# Everything goes to cli.py, bare `wiki` included: it opens the home screen when stdin and
+# stdout are terminals and prints help otherwise, so CI, pipes, hooks and cron never block
 # on input. An unknown command errors there. "$@" still carries the command name.
 _dispatch_python "$@"

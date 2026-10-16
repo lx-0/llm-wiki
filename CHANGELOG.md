@@ -18,6 +18,21 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.31] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Changed
+
+- **The bash is down to one file:** `wiki`, 129 lines of start-up, with no library beside
+  it. It finds the engine, decides where its Python environment lives, checks that you are
+  in a vault, and hands over to Python.
+- **The installer no longer builds the environment itself.** Its first `wiki` command
+  (`wiki seed`) creates the environment where the engine's own rule puts it. For a vault in
+  iCloud Drive or `~/Library/CloudStorage` that is `~/.venvs/<vault>-wiki`. The first
+  command after an install therefore no longer syncs a second time. The engine skills are
+  linked with `wiki skills sync`, as `wiki update` already does.
+
 ## [0.7.30] — 2026-10-16
 
 **For your vault:** nothing to do.

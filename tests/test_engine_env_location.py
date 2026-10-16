@@ -1,11 +1,11 @@
-"""lib/common.sh — where the engine's Python environment lives.
+"""Where the engine's Python environment lives.
 
-The rule has ONE home (bash, sourced by the `wiki` dispatcher); Python only
-reads its result via UV_PROJECT_ENVIRONMENT / sys.prefix. These pin the rule
-and the two places that must carry it literally: the exported variable and
-the agent hook commands (core/agents.py, written by `wiki hooks install`),
-because hook processes are spawned by the agent with the agent's environment,
-not by `wiki`.
+The rule has two copies, and nothing can make them one: the bootstrap `wiki` needs it before
+any Python runs (to find the interpreter), and `core/health/engine.py` judges a vault with
+it. `CLOUD_RULE` is the one table of cases both are held to. Two more places carry the
+rule's result literally: the exported UV_PROJECT_ENVIRONMENT, and the agent hook commands
+(core/agents.py, written by `wiki hooks install`), because the agent spawns hook processes
+with its own environment, not with `wiki`'s.
 
 Why it exists: lxw 2026-09-17 — the vault sits in iCloud Drive, the in-vault
 .venv got evicted while the bundled Claude CLI was running, the kernel
@@ -16,13 +16,13 @@ been silently undone by iCloud's conflict handling.
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
 from core import agents
+from core.health.engine import _in_cloud_path
 
 from ._oracle import (
     build_engine_template,
@@ -34,57 +34,15 @@ from ._oracle import (
 
 ENGINE = Path(__file__).resolve().parent.parent
 
-pytestmark = pytest.mark.skipif(
-    shutil.which("bash") is None or shutil.which("jq") is None,
-    reason="bash + jq required for the dispatcher libs",
-)
-
-
-def _bash(script: str, env: dict | None = None) -> str:
-    result = subprocess.run(
-        ["bash", "-c", script],
-        capture_output=True,
-        text=True,
-        check=True,
-        env={"HOME": "/h", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", **(env or {})},
-    )
-    return result.stdout
-
-
-def _source(vault: str, extra_env: dict | None = None, tail: str = "") -> str:
-    return _bash(
-        f"WIKI_DIR='{vault}/.wiki' ROOT_DIR='{vault}'; source '{ENGINE}/lib/common.sh'; {tail}",
-        env=extra_env,
-    )
-
-
-ICLOUD_VAULT = "/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw"
-CLOUDSTORAGE_VAULT = "/h/Library/CloudStorage/Dropbox/notes"
-PLAIN_VAULT = "/h/Sync/vault"
-
-
-def test_icloud_vault_gets_out_of_vault_environment():
-    out = _source(ICLOUD_VAULT, tail='printf "%s" "$UV_PROJECT_ENVIRONMENT"')
-    assert out == "/h/.venvs/lxw-wiki"
-
-
-def test_cloudstorage_vault_gets_out_of_vault_environment():
-    out = _source(CLOUDSTORAGE_VAULT, tail='printf "%s" "$UV_PROJECT_ENVIRONMENT"')
-    assert out == "/h/.venvs/notes-wiki"
-
-
-def test_plain_vault_keeps_uv_default():
-    out = _source(PLAIN_VAULT, tail='printf "[%s]" "${UV_PROJECT_ENVIRONMENT:-}"')
-    assert out == "[]"
-
-
-def test_operator_override_always_wins():
-    out = _source(
-        ICLOUD_VAULT,
-        extra_env={"UV_PROJECT_ENVIRONMENT": "/elsewhere/env"},
-        tail='printf "%s" "$UV_PROJECT_ENVIRONMENT"',
-    )
-    assert out == "/elsewhere/env"
+# Where a vault sits (under the test's temp dir) → whether it is cloud-synced, so that its
+# environment moves to ~/.venvs/<vault>-wiki.
+CLOUD_RULE = [
+    ("Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw", True),
+    ("Library/CloudStorage/Dropbox/notes", True),
+    ("Library/CloudStorage/GoogleDrive-op@example.com/My Drive/vault", True),
+    ("Sync/vault", False),
+    ("Documents/Mobile Documents/vault", False),  # the marker is `/Library/Mobile Documents/`
+]
 
 
 @pytest.fixture(scope="module")
@@ -92,10 +50,55 @@ def engine_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return build_engine_template(tmp_path_factory.mktemp("env-engine") / ".wiki")
 
 
+def _first_run(
+    tmp_path: Path, template: Path, where: str, extra_env: dict[str, str] | None = None
+) -> tuple[Path, Path]:
+    """A vault at ``where``, run once through the real `wiki` (`version`): the bootstrap
+    syncs the environment where the rule puts it, and the uv shim creates it there.
+    Returns the vault and HOME."""
+    vault = tmp_path / where
+    vault.mkdir(parents=True)
+    install_engine(vault, template)
+    home = tmp_path / "home"
+    home.mkdir()
+    write_uv_shim(tmp_path / "bin")
+    run = run_wiki(vault, home, tmp_path / "bin", "version", extra_env=extra_env)
+    assert run.returncode == 0, run.stderr
+    return vault, home
+
+
+@pytest.mark.parametrize(("where", "cloud"), CLOUD_RULE)
+def test_the_bootstrap_puts_the_environment_where_the_rule_says(
+    tmp_path: Path, engine_template: Path, where: str, cloud: bool
+) -> None:
+    vault, home = _first_run(tmp_path, engine_template, where)
+    outside = home / ".venvs" / f"{vault.name}-wiki" / "bin" / "python"
+    inside = vault / ".wiki" / ".venv" / "bin" / "python"
+    assert (outside.exists(), inside.exists()) == (cloud, not cloud)
+
+
+@pytest.mark.parametrize(("where", "cloud"), CLOUD_RULE)
+def test_doctor_judges_the_same_paths_cloud_synced(tmp_path: Path, where: str, cloud: bool):
+    assert _in_cloud_path(tmp_path / where / ".wiki") is cloud
+
+
+def test_operator_override_always_wins(tmp_path: Path, engine_template: Path) -> None:
+    elsewhere = tmp_path / "elsewhere" / "env"
+    vault, home = _first_run(
+        tmp_path,
+        engine_template,
+        CLOUD_RULE[0][0],
+        extra_env={"UV_PROJECT_ENVIRONMENT": str(elsewhere)},
+    )
+    assert (elsewhere / "bin" / "python").exists()
+    assert not (home / ".venvs").exists()
+    assert not (vault / ".wiki" / ".venv").exists()
+
+
 def test_an_install_in_a_cloud_vault_writes_the_environment_into_every_hook(
     tmp_path: Path, engine_template: Path
 ) -> None:
-    """End to end, through the real `wiki`: lib/common.sh exports UV_PROJECT_ENVIRONMENT for
+    """End to end, through the real `wiki`: the bootstrap exports UV_PROJECT_ENVIRONMENT for
     a vault in iCloud Drive, and `wiki hooks install` writes it into each agent's hook
     commands. Was two tests that sourced lib/agents.sh (deleted in M034-S03-T07)."""
     cloud = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Documents"

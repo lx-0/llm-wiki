@@ -262,7 +262,6 @@ def help_text() -> str:
 # repo's parent directory the vault.
 ENGINE_PARTS = (
     "wiki",
-    "lib",
     "scripts",
     "hooks",
     "prompts",

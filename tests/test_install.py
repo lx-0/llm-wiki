@@ -96,3 +96,24 @@ def test_a_headless_install_over_existing_files_keeps_them(
     assert (target / "AGENTS.md").read_text(encoding="utf-8") == "the operator's own AGENTS.md\n"
     assert "kept existing AGENTS.md" in run.stdout
     assert not machine["jq_marker"].exists()
+
+
+def test_an_install_into_a_cloud_vault_keeps_the_environment_outside_it(
+    tmp_path: Path, engine_template: Path, machine: dict[str, Path]
+) -> None:
+    """The installer creates no environment of its own: `wiki seed`'s bootstrap syncs one
+    where the engine's rule puts it — for a vault in iCloud Drive, ~/.venvs/<vault>-wiki —
+    and stamps it, so the next command does not sync again. The installer used to restate
+    the rule through lib/common.sh and sync itself (M034-S05-T05); without that file it
+    would have built a second environment inside the vault, the one iCloud evicts."""
+    target = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Documents" / "lxw"
+    target.mkdir(parents=True)
+
+    run = _install(target, engine_template, machine)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    venv = machine["home"] / ".venvs" / "lxw-wiki"
+    assert (venv / "bin" / "python").exists()
+    assert (venv / ".wiki-synced").exists()
+    assert not (target / ".wiki" / ".venv").exists()
+    assert (target / ".claude" / "skills" / "use-llm-wiki").is_symlink()

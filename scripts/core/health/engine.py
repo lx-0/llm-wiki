@@ -316,7 +316,7 @@ _CLOUD_PATH_MARKERS = ("/Library/Mobile Documents/", "/Library/CloudStorage/")
 # cloud provider). `stat.SF_DATALESS` only exists from Python 3.13.
 _SF_DATALESS = 0x40000000
 # Engine directories that are read on every run and must be resident.
-_EVICTION_SCAN_DIRS = ("scripts", "prompts", "templates", "hooks", "lib")
+_EVICTION_SCAN_DIRS = ("scripts", "prompts", "templates", "hooks")
 
 
 def _is_dataless(st: os.stat_result) -> bool:

@@ -9,8 +9,8 @@ relative arguments keep resolving against the operator's cwd.
 
 Consumers: `cli.py` (every `wiki <command>` handler), `core/piggybacks.py` (runner +
 task), `flush.py` (compile + dashboard children), the preprocessors' compile trigger.
-The bash layer (`wiki`, `lib/*.sh`) spells the same thing as
-`PYTHONPATH="$WIKI_DIR/scripts" uv run … python -m <module>` until M034 ports it.
+The bash layer spelled the same thing as `PYTHONPATH="$WIKI_DIR/scripts" uv run … python
+-m <module>` until M034 ported it; the bootstrap `wiki` spawns no module itself.
 """
 
 from __future__ import annotations

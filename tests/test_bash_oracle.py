@@ -893,7 +893,7 @@ CLOUD_UPDATE: dict[str, Prepare] = {
 
 @pytest.fixture
 def cloud_vault(tmp_path: Path, engine_template: Path) -> dict[str, Path]:
-    """A fixture vault in iCloud Drive's folder layout, which `lib/common.sh`'s cloud rule
+    """A fixture vault in iCloud Drive's folder layout, which the bootstrap's cloud rule
     matches, and HOME outside it: the engine environment is `~/.venvs/<vault>-wiki`."""
     root = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Documents"
     root.mkdir(parents=True)

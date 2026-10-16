@@ -29,10 +29,9 @@ The **vault's own `AGENTS.md`** (separate file, not this one) is the article sch
 
 ```text
 llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-file reference is docs/engine-layout.md
-├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard; every command,
+├── wiki                     ← entry-point CLI (bash, ≤ 150 lines, no library: the bootstrap — its own
+│                              path, the venv-location rule, the fail-closed vault guard; every command,
 │                              bare `wiki` included, goes to scripts/cli.py)
-├── lib/                     ← what is left of the bash layer: common.sh (the venv-location rule,
-│                              output helpers), until M034-S05-T05 folds it into the bootstrap
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
@@ -220,7 +219,7 @@ Scripts use `Path(__file__).resolve().parent` for `SCRIPTS_DIR`, `.parent.parent
 
 ### Python environment
 
-The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). `install.sh` runs `uv sync --project <DEST>` so this happens automatically. **Exception — cloud-synced vaults** (iCloud Drive, `~/Library/CloudStorage`): the environment lives at `~/.venvs/<vault>-wiki`, addressed via `UV_PROJECT_ENVIRONMENT`, which the `wiki` dispatcher exports and the installed hook commands carry literally (rule: `lib/common.sh`, rationale: `docs/engine-layout.md` hard rule). On such a vault, run engine commands through `wiki …`; a bare `uv run --project .wiki` would rebuild an environment inside the cloud folder.
+The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). The first `wiki` call creates it (`install.sh` runs `wiki seed`), and the bootstrap re-syncs it whenever `uv.lock` or `pyproject.toml` is newer than its `.wiki-synced` stamp. **Exception — cloud-synced vaults** (iCloud Drive, `~/Library/CloudStorage`): the environment lives at `~/.venvs/<vault>-wiki`, addressed via `UV_PROJECT_ENVIRONMENT`, which the `wiki` bootstrap exports and the installed hook commands carry literally (rule: the bootstrap `wiki`, held with `wiki doctor`'s copy to one table in `tests/test_engine_env_location.py`; rationale: `docs/engine-layout.md` hard rule). On such a vault, run engine commands through `wiki …`; a bare `uv run --project .wiki` would rebuild an environment inside the cloud folder.
 
 `scripts/` is the engine's source root, not a package (DECISIONS 2026-10-14; no `scripts/__init__.py`, ever — `tests/test_layout.py` guards it). Three ways to invoke engine code, and which one applies depends on where the module sits:
 
@@ -315,7 +314,7 @@ Long-term direction: remove agent-side filesystem writes entirely — agent retu
   under 1,000 lines unless `docs/engine-layout.md` § "Large modules" lists it with the reason
   it stays one module (`tests/test_module_size.py`). Both lists only shrink — split the code,
   don't extend the list.
-- No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `lib/common.sh` (bash) and `core/console` (Python: `ok` / `warn` / `info` / `print_error`).
+- No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `core/console` (`ok` / `warn` / `info` / `fail` / `print_error`); the bootstrap `wiki` has only its `die`.
 - Commit messages: imperative mood, short subject (≤70 chars), body explains why.
 
 ## When in doubt

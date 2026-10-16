@@ -154,8 +154,8 @@ def pull(*, sync_skills: bool) -> int:
 
 def sync_hint(venv: str | None) -> str:
     """The `uv sync` an operator can paste. Their shell never had the bootstrap's export,
-    so the environment is named, and every path is quoted for another shell (lib/common.sh's
-    `sync_hint`): a bare `uv sync` would rebuild .wiki/.venv inside a cloud-synced vault."""
+    so the environment is named, and every path is quoted for another shell (the bootstrap
+    `wiki`'s `sync_hint`): a bare `uv sync` would rebuild .wiki/.venv inside a cloud-synced vault."""
     env = agents.shell_quote(venv or str(WIKI_DIR / ".venv"))
     return f"{_ENV}={env} uv sync --project {agents.shell_quote(str(WIKI_DIR))}"
 

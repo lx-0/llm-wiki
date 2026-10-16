@@ -11,8 +11,10 @@
 #   - Refuses to overwrite an existing .wiki/ (use `wiki update` instead)
 #   - Clones the repo into <target>/.wiki/
 #   - Seeds <target>/.wiki/config.yaml from config.example.yaml
-#   - Runs `uv sync` inside .wiki/ so the venv lives at <target>/.wiki/.venv/
 #   - Makes the wiki entry executable
+#   - Runs `wiki seed`, whose bootstrap creates the engine's Python environment
+#     (<target>/.wiki/.venv, or ~/.venvs/<vault>-wiki for a cloud-synced vault)
+#   - Links the engine skills (`wiki skills sync`)
 #   - Prints next steps
 
 set -euo pipefail
@@ -133,69 +135,31 @@ if (( has_existing )); then
   fi
 fi
 
-# ── Wire skills into Claude Code ─────────────────────────────────────
-# Each engine skill at .wiki/skills/<name>/ is symlinked to
-# <vault>/.claude/skills/<name>/ so Claude Code discovers them
-# automatically. After install, `wiki update` runs `wiki skills sync`
-# as a post-step, so newly-pulled skills land in .claude/skills/ without
-# a manual symlink dance (opt out via `wiki update --no-skills`).
-SKILLS_SRC="$DEST/skills"
-SKILLS_DST="$TARGET/.claude/skills"
-if [[ -d "$SKILLS_SRC" ]]; then
-  mkdir -p "$SKILLS_DST"
-  symlinked=0
-  for skill_path in "$SKILLS_SRC"/*/; do
-    [[ -d "$skill_path" ]] || continue
-    name=$(basename "$skill_path")
-    target_link="$SKILLS_DST/$name"
-    if [[ -L "$target_link" || -e "$target_link" ]]; then
-      continue
-    fi
-    # Relative symlink so the link survives if the vault is moved
-    # (as long as it stays alongside its own .wiki/).
-    ln -s "../../.wiki/skills/$name" "$target_link"
-    symlinked=$((symlinked + 1))
-  done
-  if (( symlinked > 0 )); then
-    ok "linked $symlinked skill(s) into .claude/skills/"
-  fi
-fi
-
 # ── Permissions ──────────────────────────────────────────────────────
 chmod +x "$DEST/wiki"
 [[ -x "$DEST/wiki" ]] || die "Failed to make $DEST/wiki executable"
 
-# ── venv ─────────────────────────────────────────────────────────────
-# Create the Python venv inside .wiki/ so it stays alongside the engine
-# (not at the vault root). Subsequent uv invocations use --project .wiki.
-# Exception, decided by the engine's own rule (lib/common.sh, the single
-# source): a vault inside iCloud Drive / CloudStorage gets its environment
-# at ~/.venvs/<vault>-wiki instead — cloud eviction SIGKILLs a running
-# binary there. Ask the rule rather than restating it.
-VENV_OVERRIDE="$(WIKI_DIR="$DEST" ROOT_DIR="$TARGET" bash -c \
-  'source "$WIKI_DIR/lib/common.sh" >/dev/null 2>&1; printf "%s" "${UV_PROJECT_ENVIRONMENT:-}"')"
-if [[ -n "$VENV_OVERRIDE" ]]; then
-  export UV_PROJECT_ENVIRONMENT="$VENV_OVERRIDE"
-  VENV_PATH="$VENV_OVERRIDE"
-else
-  VENV_PATH="$DEST/.venv"
-fi
-printf "%ssyncing python deps into %s …%s\n" "$D" "$VENV_PATH" "$N"
-if uv sync --project "$DEST" --quiet 2>/dev/null; then
-  ok "venv ready at $VENV_PATH"
-else
-  warn "uv sync failed — run 'uv sync --project $DEST' manually before first use"
-fi
-
-# ── Seed vault templates ─────────────────────────────────────────────
-# `wiki seed` (scripts/seed_cli.py), now that the engine's environment exists. Its
-# vault guard wants .obsidian/ — the old bash seed created it silently, so a fresh
-# directory becomes a vault here, as before.
+# ── Seed vault templates (and the engine's environment) ──────────────
+# `wiki seed` is the first `wiki` call. Its bootstrap creates the engine's Python
+# environment where the engine's own rule puts it — .wiki/.venv, or ~/.venvs/<vault>-wiki
+# for a vault in iCloud Drive / CloudStorage, where eviction SIGKILLs a running binary —
+# and stamps it, so the next command does not sync again. This installer used to restate
+# that rule through lib/common.sh (folded into `wiki` in M034-S05-T05) and ran its own
+# `uv sync`, which left no stamp. Seed's vault guard wants .obsidian/: the old bash seed
+# created it silently, so a fresh directory becomes a vault here, as before.
 mkdir -p "$TARGET/.obsidian"
 seed_args=(seed)
 [[ "$seed_force" == 1 ]] && seed_args+=(--force)
 if ! (cd "$TARGET" && "$DEST/wiki" "${seed_args[@]}"); then
   warn "seeding failed — once the environment is ready, run: cd '$TARGET' && ./.wiki/wiki seed"
+fi
+
+# ── Wire skills into Claude Code ─────────────────────────────────────
+# Each engine skill at .wiki/skills/<name>/ is linked into <vault>/.claude/skills/ so
+# Claude Code discovers it: `wiki skills sync`, which `wiki update` also runs after every
+# pull (opt out there with `--no-skills`).
+if ! (cd "$TARGET" && "$DEST/wiki" skills sync); then
+  warn "linking the engine skills failed — run: cd '$TARGET' && ./.wiki/wiki skills sync"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────
@@ -210,5 +174,5 @@ ${B}Next steps:${N}
 
 ${D}docs:    $DEST/README.md${N}
 ${D}config:  $DEST/config.yaml${N}
-${D}venv:    $VENV_PATH      (run engine commands via './.wiki/wiki …' — it knows where the environment is)${N}
+${D}python:  run engine commands via './.wiki/wiki …' — it knows where the environment is${N}
 EOF

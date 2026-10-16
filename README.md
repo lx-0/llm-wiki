@@ -255,7 +255,7 @@ curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bas
 curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bash -s -- ~/path/to/vault
 ```
 
-The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, runs `uv sync` so the venv lives at `<target>/.wiki/.venv/` (or at `~/.venvs/<vault>-wiki` when the vault sits in iCloud Drive / CloudStorage — cloud sync evicts files and kills running binaries; the engine addresses that environment via `UV_PROJECT_ENVIRONMENT`), and seeds the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work.
+The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, and runs `wiki seed`. That first `wiki` call creates the venv at `<target>/.wiki/.venv/` (or at `~/.venvs/<vault>-wiki` when the vault sits in iCloud Drive / CloudStorage — cloud sync evicts files and kills running binaries; the engine addresses that environment via `UV_PROJECT_ENVIRONMENT`). The seed fills the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work — and `wiki skills sync` links the engine's skills.
 
 | Created path | Source | Purpose |
 |---|---|---|

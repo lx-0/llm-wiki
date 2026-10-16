@@ -68,7 +68,7 @@ def _err(msg: str) -> None:
 
 
 def _banner(title: str, subtitle: str | None = None) -> None:
-    """Match lib/common.sh:banner — bold title, optional dim subtitle, blank.
+    """The bash `banner` (lib/common.sh, gone in M034-S05-T05): bold title, optional dim subtitle, blank.
 
     Flush explicitly: when stdout is a pipe (desktop / hooks capture it) Python
     block-buffers, so without a flush the buffered banner would land AFTER the

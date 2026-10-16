@@ -14,7 +14,7 @@ Usage (`wiki stats`, M034-S01-T07 — it runs from the engine's own environment)
     wiki stats --vault ~/path/to/vault
 
 Never a bare `uv run --project .wiki python .wiki/scripts/health.py`: on a vault in iCloud
-Drive it ignores the engine's environment location (lib/common.sh) and recreates the
+Drive it ignores the engine's environment location (the bootstrap `wiki`) and recreates the
 Python environment inside the synced folder (docs/engine-layout.md, the `.venv/` rule).
 """
 

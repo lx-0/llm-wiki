@@ -4,7 +4,7 @@ The engine lives under `<vault>/.wiki/` — hidden from Obsidian's file tree (Ob
 
 For a higher-level view (vault layout, install, CLI usage), see the [README](../README.md). For development conventions (style, side-effect rules, how to add a tunable / prompt / agent target), see [AGENTS.md](../AGENTS.md).
 
-> **Hard rule — `.venv/` location.** The Python virtualenv lives at `<vault>/.wiki/.venv/`, never at the vault root — **unless the vault is inside a cloud-synced folder** (iCloud Drive `~/Library/Mobile Documents/…`, `~/Library/CloudStorage/…`), in which case it lives at `~/.venvs/<vault>-wiki` and every uv invocation is told so via `UV_PROJECT_ENVIRONMENT`. The rule has one home, `lib/common.sh` (`wiki_venv_dir`): the `wiki` dispatcher exports the variable and execs that environment's `bin/python` directly, `lib/agents.sh` writes it literally into the agent hook commands, `install.sh` asks the rule, and Python only reads the result (`sys.prefix`). Why: cloud sync evicts file contents, and macOS SIGKILLs a running binary whose pages stop matching their code signature mid-swap — the 200 MB bundled Claude CLI died three times in one night on the operator vault (2026-09-17). A symlink at `.wiki/.venv` is not a fix; iCloud shelved it as `.venv 2` and kept its directory. A vault-root `.venv/` would leak engine internals into the data layer and break `wiki update` round-trips. Never start the engine with a bare `uv run --project .wiki` on such a vault — go through `wiki …`, which knows where the environment is; `wiki doctor` → `engine-cloud-eviction` reports the actual state.
+> **Hard rule — `.venv/` location.** The Python virtualenv lives at `<vault>/.wiki/.venv/`, never at the vault root — **unless the vault is inside a cloud-synced folder** (iCloud Drive `~/Library/Mobile Documents/…`, `~/Library/CloudStorage/…`), in which case it lives at `~/.venvs/<vault>-wiki` and every uv invocation is told so via `UV_PROJECT_ENVIRONMENT`. The rule lives in the bootstrap `wiki`, which needs it before any Python runs: it exports the variable and execs that environment's `bin/python` directly. `core/agents.py` writes the variable literally into the agent hook commands, `install.sh` lets the first `wiki` call create the environment, and Python only reads the result (`sys.prefix`). The one other copy, `core/health/engine.py`'s cloud markers for `wiki doctor`, is held to the same table of cases (`tests/test_engine_env_location.py`). Why: cloud sync evicts file contents, and macOS SIGKILLs a running binary whose pages stop matching their code signature mid-swap — the 200 MB bundled Claude CLI died three times in one night on the operator vault (2026-09-17). A symlink at `.wiki/.venv` is not a fix; iCloud shelved it as `.venv 2` and kept its directory. A vault-root `.venv/` would leak engine internals into the data layer and break `wiki update` round-trips. Never start the engine with a bare `uv run --project .wiki` on such a vault — go through `wiki …`, which knows where the environment is; `wiki doctor` → `engine-cloud-eviction` reports the actual state.
 
 ## Contents
 
@@ -19,13 +19,11 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 ```text
 .wiki/
-├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard; every command — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version, update, the dream routing, the OAuth aliases — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
+├── wiki                       ← entry point (bash, ≤ 150 lines, no library: `tests/test_bash_budget.py`) — bootstrap: its own path, the engine-environment rule, the fail-closed vault guard; every command — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version, update, the dream routing, the OAuth aliases — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
 ├── install.sh                 ← one-liner installer (also re-runnable from a checkout)
 ├── config.example.yaml        ← tracked  ── │ copy at install time
 ├── config.yaml                ← gitignored ─┘
 ├── pyproject.toml + uv.lock
-├── lib/
-│   └── common.sh              ← the engine-environment rule (wiki_venv_dir), output helpers, shell_quote / sync_hint, require_cmd
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
@@ -302,13 +300,15 @@ A module under `scripts/` stays at or under 1,000 lines; one that is larger is l
 
 ## Why bash + python?
 
-- **bash** for the bootstrap only: resolve the engine, guard the vault, hop into the venv's
-  Python — and `wiki update`, which pulls the engine it runs from (its port is M034-S05).
+- **bash** for the bootstrap only, `wiki`: resolve the engine, locate its environment (the
+  rule must hold before any Python can run), guard the vault, hop into the venv's Python. No
+  command is bash since M034-S05; `wiki update` too pulls in Python and re-executes the
+  pulled entry.
 - **python** for everything else, JSON included. The agent-config and seed merges were jq
   until M034; `core/jqjson.py` now reads, compares and writes JSON the way jq 1.7 did, held
   byte for byte to the bash's recorded output (`tests/golden/agents/`, `tests/golden/seed/`).
-  Nothing needs jq any more; `install.sh` seeds through `wiki seed` once the environment
-  exists.
+  Nothing needs jq any more. `install.sh` clones, then lets `wiki seed` create the
+  environment and `wiki skills sync` link the skills.
 
 ## Where to go next
 

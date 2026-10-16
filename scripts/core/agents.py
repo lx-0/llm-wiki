@@ -190,8 +190,8 @@ def installed_wiki_commands(*, home: Path, root: Path) -> dict[tuple[str, str], 
 
 
 def shell_quote(value: str) -> str:
-    """``value`` in single quotes for a POSIX shell, each ' written as '\\'' (lib/common.sh's
-    shell_quote). Always quoted, unlike shlex.quote, so a path without an apostrophe comes
+    """``value`` in single quotes for a POSIX shell, each ' written as '\\'' (the bootstrap
+    `wiki`'s shell_quote). Always quoted, unlike shlex.quote, so a path without an apostrophe comes
     out exactly as earlier installs wrote it."""
     return "'" + value.replace("'", "'\\''") + "'"
 

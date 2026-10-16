@@ -695,7 +695,7 @@ def _git_revision() -> str:
 # where its history + editing pay off; the home loop owns its own input.
 
 # Tag→ANSI table sourced from `core.console`'s C_* constants — exactly the
-# same byte sequences compile.py / dream.py / lib/common.sh emit, all
+# same byte sequences compile.py / dream.py emit, all
 # gated by the same `is_tty()` (stderr.isatty()) flag. If compile's colors
 # render in the operator's terminal, the menu's render too — they are now
 # literally the same bytes on the same stream.
