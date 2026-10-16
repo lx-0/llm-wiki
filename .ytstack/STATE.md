@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T04:25:00+02:00
+last_updated: 2026-10-16T05:20:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: T04
+active_task: T05
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,22 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 / S06 / T04 planned — ready to execute (`M034-S06-T04-PLAN.md`: `wiki
-collect <name> -- <flags>` into the collectors' `main(argv)`, the three by-path entry scripts
-deleted, PROCESS.md's 11 bare `uv run --project .wiki` lines become `wiki` commands incl.
-`refresh-dashboards [--dry-run]`). S06: 3/7 done. Slices S01–S05 are complete (5/6).
+**Status:** M034 / S06 / T05 planned — ready to execute (`M034-S06-T05-PLAN.md`: README
+378 → ≤ 300 and AGENTS.md 326 → ≤ 250, each section named for its reader in the Contents;
+AGENTS.md's six feature sections out (FEATURES / cli.md / config.md hold them), a short
+invariants list stays; the TUI header loses ✨ and the commit hash; a doc audit over the
+retired M034 names; 0.7.34). S06: 4/7 done. Slices S01–S05 are complete (5/6).
+
+T04 closed (`M034-S06-T04-SUMMARY.md`): one collect verb (0.7.33), exit criterion 6 met.
+- `wiki collect <name> -- <flags>` passes the tail to the collector's own `main(argv)`
+  (screenshots, browser, tabs). youtube and folder-index keep `ingest-youtube` / `index`
+  (DECISIONS 2026-10-16).
+- The three by-path entry scripts are gone, and the output gate covers all 14 collector
+  modules.
+- `refresh-dashboards` is in the catalogue, with help and `--dry-run`.
+- PROCESS.md teaches no bare `uv run --project .wiki` line.
+- T05 input: README's eleven-collector lists, its "Running scripts manually", and its CLI
+  paragraph; `backlog/bare-uv-run-forms-in-docs.md`.
 
 T03 closed (`M034-S06-T03-SUMMARY.md`): the collector registry is a lazy table
 (`collectors.MODULES`). `import collectors` takes 0.014 s, from 0.07 s, and

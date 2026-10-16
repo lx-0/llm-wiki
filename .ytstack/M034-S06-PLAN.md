@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M034-S06 -- Slice Plan
@@ -38,7 +38,7 @@ completed_tasks: 3
   imports no collector module" is amended with the measurement. `import collectors` costs
   0.07 s, 0.067 s of it `collectors.base` + `core.config`; the 0.25 s of the backlog
   (2026-10-14) is gone. Recorded in DECISIONS. (Split at planning, as S05 split update.)
-- [ ] T04 -- Collectors, the verb: `wiki collect <name> -- <flags>` passes the flags to the
+- [x] T04 -- Collectors, the verb: `wiki collect <name> -- <flags>` passes the flags to the
   collector's `main(argv)` (screenshots, browser, tabs, youtube). The three by-path entry
   scripts and PROCESS.md's second invocation form are deleted.
 
