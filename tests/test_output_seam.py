@@ -35,7 +35,9 @@ def test_no_command_module_calls_print():
         for module in _command_modules()
         if module not in ALLOWED
         for node in ast.walk(ast.parse((SCRIPTS / module).read_text(encoding="utf-8")))
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print"
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "print"
     ]
     assert calls == [], f"{len(calls)} print( call(s) outside core.console:\n" + "\n".join(calls)
 
