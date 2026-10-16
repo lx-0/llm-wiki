@@ -149,14 +149,14 @@ Interface sweep 0.3.0 (C10): the instrument loader surfaces the `inference:` con
 
 | Feature | Status | Code | Trigger | Docs |
 |---|---|---|---|---|
-| Dashboard.md (Obsidian Homepage) | 🟢 | `templates/dashboard.md`, `lib/seed.sh:seed_vault_templates` | Seeded on install / `wiki seed` | PROCESS §11, README |
+| Dashboard.md (Obsidian Homepage) | 🟢 | `templates/dashboard.md`, `scripts/core/seed.py:walk` | Seeded on install / `wiki seed` | PROCESS §11, README |
 | Dashboard stats refresh (`_dashboard-stats.md`) | 🟢 | `scripts/dashboard/dashboard_stats.py` | Synchronous post-flush in `flush.py:refresh_dashboard_stats` + `wiki compile / lint / seed / correct` shell-wrapper helpers | PROCESS §11 |
 | Dashboard lint refresh (`_dashboard-lint.md`) | 🟢 | `scripts/dashboard/dashboard_lint.py` | Synchronous post-flush in `flush.py:refresh_dashboard_lint`; same shell-wrapper helpers | PROCESS §11 |
-| Agent-button auto-wiring | 🟢 | `scripts/dashboard/agent_buttons.py`, `lib/seed.sh:_merge_registry` + `_rewrite_dashboard_agent_buttons` | `wiki seed` discovers `prompts/agents/*.md` with `button:` block, merges their entries by id into both plugin registries (Shell commands' `shell_commands`, Meta-Bind's `buttonTemplates`), rewrites the marker region in dashboard.md | PROCESS §13, M004 |
+| Agent-button auto-wiring | 🟢 | `scripts/dashboard/agent_buttons.py`, `scripts/core/seed.py:merge_registry`, `scripts/seed_cli.py` (`Seeder.registry` + `dashboard_buttons`) | `wiki seed` discovers `prompts/agents/*.md` with `button:` block, merges their entries by id into both plugin registries (Shell commands' `shell_commands`, Meta-Bind's `buttonTemplates`), rewrites the marker region in dashboard.md | PROCESS §13, M004 |
 | Daily-button injection | 🟢 | `scripts/dashboard/inject_daily_button.py` | `PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.inject_daily_button` | — |
 | Maps of Content (MOCs) | 🟢 | `knowledge/MOCs/*.md`, templates in `templates/knowledge/MOCs/`, `scripts/pin.py` | `wiki seed` seeds `people.md` / `projects.md` / `concepts.md` stubs; operator adds wikilinks | PROCESS §11 MOC subsection |
 | `wiki pin` (article → MOC section) | 🟢 | `scripts/pin.py` | `wiki pin <article> [--section "Name"] [--moc people] [--summary "X"]` | PROCESS §11 |
-| Bases-browser (`knowledge.base`) | 🟢 | `templates/knowledge.base`, `lib/seed.sh:seed_vault_templates` | Seeded as additive template; Obsidian native (1.10+) | PROCESS §11 |
+| Bases-browser (`knowledge.base`) | 🟢 | `templates/knowledge.base`, `scripts/core/seed.py:walk` | Seeded as additive template; Obsidian native (1.10+) | PROCESS §11 |
 | History layer (`history.jsonl`) + P2 charts | 🟢 | `scripts/core/utils.py:append_history`, `read_history`; dashboard.md "📈 History" section | Auto-appended on compile / flush events | PROCESS §11 |
 
 ### Hard facts (corrections)
@@ -184,7 +184,7 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 | `wiki status` | 🟢 | `scripts/status_cli.py` (dispatched by `scripts/cli.py`) | Config summary + hook install table + Ollama probe |
 | `wiki stats` | 🟢 | `scripts/health.py` (dispatched by `scripts/cli.py`) | Read-only vault dashboard: knowledge counts, raw-source mix, compile backlog, graph density, pipeline cadence |
 | `wiki update` | 🟢 | `wiki:cmd_update` (its skills step runs `wiki skills sync`) | `git pull --ff-only` + skill sync; preserves `config.yaml` + `.venv/` |
-| `wiki seed` / `wiki seed --force` | 🟢 | `wiki:cmd_seed`, `lib/seed.sh` | Additive template seed + drift detection |
+| `wiki seed` / `wiki seed --force` | 🟢 | `scripts/seed_cli.py`, `scripts/core/seed.py` | Additive template seed + drift detection |
 | `wiki config` (editor/get/set/keys/path/wizard/status) | 🟢 | `scripts/config_cli.py` over `scripts/core/config.py` (dispatched by `scripts/cli.py`) | Bare `wiki config` is the interactive section → key → value editor; round-robin backup on every set |
 | `wiki hooks` (install/uninstall/status) | 🟢 | `scripts/hooks_cli.py` over `scripts/core/agents.py` (dispatched by `scripts/cli.py`) | Merge into agent configs that keeps other tools' hooks; a backup before every write (`scripts/core/backup.py`) |
 | `wiki skills` (install/uninstall/sync/status) | 🟢 | `scripts/skills_cli.py` (dispatched by `scripts/cli.py`) | Symlink into `<vault>/.claude/skills/`, foreign entries preserved. `--global` (gated by `skills.global_install`) also links global-eligible skills into `~/.claude/skills/` + registers the vault in `~/.config/llm-wiki/vaults` |

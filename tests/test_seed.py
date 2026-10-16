@@ -88,6 +88,23 @@ def _lines_about(out: str, name: str) -> list[str]:
     return [line for line in out.splitlines() if name in line]
 
 
+def test_seed_refuses_a_directory_that_is_not_a_vault(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Seed writes a whole vault's templates. Called straight through `cli.main`, as a test
+    did, it ran against the checkout's parent and filled it with a vault (M034-S04-T04). The
+    bash `wiki` guards every command; the command guards itself too."""
+    import seed_cli
+
+    not_a_vault = tmp_path / "somewhere"
+    not_a_vault.mkdir()
+    monkeypatch.setattr(seed_cli, "ROOT_DIR", not_a_vault)
+    for argv in ([], ["--force"], ["--extract-custom", ".obsidian/graph.json"]):
+        assert seed_cli.main(argv) == 1
+        assert "is not an Obsidian vault" in capsys.readouterr().err
+    assert list(not_a_vault.iterdir()) == []
+
+
 def test_a_fresh_seed_wires_every_dashboard_button(env: dict[str, Path]) -> None:
     _seed(env)
     shell = _read(env, SHELL)

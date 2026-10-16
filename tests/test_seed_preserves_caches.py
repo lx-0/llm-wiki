@@ -2,18 +2,20 @@
 `_dashboard-stats.md` (cache files are producer-only outputs, not templates).
 
 Reproduces the lxw bug: live cache with real counts gets bytegenau replaced
-by the placeholder template after `wiki seed --force` ran. Lock that down.
+by the placeholder template after `wiki seed --force` ran. Lock that down —
+against the Python seed since M034-S04-T04 (`seed_cli.seed_vault`, the run
+without the dashboards refresh that follows a writing run).
 """
 
 from __future__ import annotations
 
 import hashlib
 import shutil
-import subprocess
 from pathlib import Path
 
+import seed_cli
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
-LIB_DIR = REPO_ROOT / "lib"
 TEMPLATE_FILE = REPO_ROOT / "templates" / "_dashboard-stats.md"
 
 LIVE_CACHE_CONTENT = """\
@@ -37,16 +39,15 @@ def _md5(p: Path) -> str:
     return hashlib.md5(p.read_bytes()).hexdigest()
 
 
-def test_seed_force_does_not_clobber_live_dashboard_stats(tmp_path: Path) -> None:
-    """seed_vault_templates with force=1 must leave a populated cache file untouched."""
+def test_seed_force_does_not_clobber_live_dashboard_stats(tmp_path: Path, capsys) -> None:
+    """seed with --force must leave a populated cache file untouched."""
     # Build minimal wiki_dir + target layout.
     wiki_dir = tmp_path / "wiki"
     target = tmp_path / "vault"
     (wiki_dir / "templates").mkdir(parents=True)
-    target.mkdir()
+    (target / ".obsidian").mkdir(parents=True)
 
-    # Seed templates dir with the actual placeholder + the two other templates
-    # `_seed_file` will iterate.
+    # The templates dir holds the actual placeholder next to two templates the walk lists.
     shutil.copy(TEMPLATE_FILE, wiki_dir / "templates" / "_dashboard-stats.md")
     (wiki_dir / "templates" / "AGENTS.example.md").write_text(
         "AGENTS placeholder", encoding="utf-8"
@@ -60,30 +61,12 @@ def test_seed_force_does_not_clobber_live_dashboard_stats(tmp_path: Path) -> Non
     cache.write_text(LIVE_CACHE_CONTENT, encoding="utf-8")
     cache_md5_before = _md5(cache)
 
-    # Source common.sh + seed.sh, invoke seed_vault_templates with force=1.
-    script = f"""
-set -euo pipefail
-export WIKI_DIR="{wiki_dir}"
-export ROOT_DIR="{target}"
-source "{LIB_DIR}/common.sh"
-source "{LIB_DIR}/seed.sh"
-seed_vault_templates "{target}" "{wiki_dir}" 1
-"""
-    result = subprocess.run(
-        ["bash", "-c", script],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-    )
-    # Seed itself must succeed (not a test of failure, of preservation).
-    assert result.returncode == 0, f"seed failed: {result.stderr}"
+    assert seed_cli.seed_vault(target, wiki_dir, force=True, check=False, only=None)
+    out = capsys.readouterr().out
+    assert "overwrote AGENTS.md (--force)" in out or "seeded AGENTS.md" in out
 
     # The cache file must NOT have been touched.
-    cache_md5_after = _md5(cache)
-    assert cache_md5_after == cache_md5_before, (
-        f"cache was clobbered. Stdout: {result.stdout}\nStderr: {result.stderr}"
-    )
+    assert _md5(cache) == cache_md5_before, f"cache was clobbered. Output: {out}"
 
     # And content must still be the live counts.
     after_content = cache.read_text(encoding="utf-8")

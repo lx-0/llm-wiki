@@ -192,6 +192,18 @@ def test_same_is_jqs_equality() -> None:
     assert not jqjson.same({"a": True}, {"a": num("1")})
 
 
+def test_setpath_refuses_what_jq_refuses() -> None:
+    """jq: `{} | setpath([0]; 1)` "Cannot index object with number", and so on — the bash's
+    --extract-custom says "could not compute the drift" on it
+    (tests/golden/bash/seed-extract-custom-config-now-a-list.txt)."""
+    assert jqjson.setpath(None, (2,), 1) == [None, None, 1]
+    for value, path in (({}, (0,)), ([], ("a",)), ("s", ("a",)), (1, (0,))):
+        with pytest.raises(TypeError):
+            jqjson.setpath(value, path, 1)
+    with pytest.raises(TypeError):
+        seed.compute_overlay(jqjson.load(GRAPH), jqjson.loads('[{"scale": 2}]'))
+
+
 def test_numbers_keep_their_literal() -> None:
     value = jqjson.loads('{"a": 1.50, "b": 1e3, "c": -0, "d": 12345678901234567890}')
     assert value["a"] == Decimal("1.50")

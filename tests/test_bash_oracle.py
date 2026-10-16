@@ -21,6 +21,7 @@ Two kinds of case:
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import shutil
@@ -151,7 +152,22 @@ def fresh_vault(tmp_path: Path, engine_template: Path) -> dict[str, Path]:
     return _build_env(tmp_path, engine_template)
 
 
+@functools.cache
+def _engine_revision(wiki: Path) -> str:
+    """The engine copy's commit. It depends on the engine's content, so the regex rule for
+    revisions, which needs a digit, misses it whenever the short form happens to be all
+    letters (`fafcffa`, M034-S04-T04); named here, it is replaced whatever it looks like."""
+    run = subprocess.run(
+        ["git", "-C", str(wiki), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return run.stdout.strip()
+
+
 def _placeholders(env: dict[str, Path]) -> dict[str, str]:
+    revision = _engine_revision(env["vault"] / ".wiki")
     return {
         str(env["vault"]): "<VAULT>",
         str(env["home"]): "<HOME>",
@@ -163,6 +179,8 @@ def _placeholders(env: dict[str, Path]) -> dict[str, str]:
         # the fixture a venv of links onto the test venv, the same interpreter either way
         str(Path(sys.executable).parent.parent): "<VENV>",
         str(env["vault"] / ".wiki" / ".venv"): "<VENV>",
+        revision: "<REV>",
+        revision[:7]: "<REV>",
     }
 
 

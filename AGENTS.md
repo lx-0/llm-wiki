@@ -32,7 +32,7 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 ├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
 │                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
 ├── lib/                     ← the bash layer, shrinking as M034 ports it: common.sh (paths, the venv-location rule),
-│                              ui.sh (the prompt for update), seed.sh
+│                              ui.sh (the prompt for update), seed.sh (install.sh's seeding until M034-S04-T05)
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
@@ -170,9 +170,9 @@ Every LLM call is metered in TOKENS, keyed by `(provider, model)` — never doll
 
 `wiki seed` applies `templates/` into the vault. How a template file is handled depends on whether operators customise it:
 
-- **Engine-owned (markdown/YAML — `AGENTS.md`, `dashboard.md`, `knowledge.base`):** whole-file via `_seed_file`. Seed-if-missing, keep-if-exists, refresh with a targeted `wiki seed <path> --force`. Operators shouldn't hand-edit these; they're regenerated.
-- **Customisable JSON configs (`graph.json`, `app.json`, plugin `data.json`):** route through `_seed_json_overlay`. The engine owns the template (base); the operator's delta lives in an **untracked** overlay at `<vault>/.wiki/custom/<rel>`; the live file is derived as `template ⊕ overlay` (jq deep-merge). This keeps the file engine-updatable (new keys flow in) while preserving customisations — operators edit the overlay, `--force` re-derives from template ⊕ overlay, `wiki seed --extract-custom <rel>` bootstraps an overlay from existing drift. An overlay only overrides: a key or array entry the operator removed, or a value cleared to `null`, comes back from the template on `--force` (`.ytstack/backlog/overlay-cannot-carry-deletions.md`). NEVER make a customisable config keep-or-`--force` whole-file — that recreates the force-vs-drift dilemma.
-- **Accumulating lists (community-plugins, shell-commands, meta-bind buttons):** bespoke additive-merge-by-id/union (`_merge_*`), preserving operator entries while adding/updating engine-managed ones.
+- **Engine-owned (markdown/YAML — `AGENTS.md`, `dashboard.md`, `knowledge.base`):** whole-file (`seed_cli.Seeder.copy`; `core/seed.py:walk` lists every seeded file and how). Seed-if-missing, keep-if-exists, refresh with a targeted `wiki seed <path> --force`. Operators shouldn't hand-edit these; they're regenerated.
+- **Customisable JSON configs (`graph.json`, `app.json`, plugin `data.json`):** route through `seed_cli.Seeder.overlay`. The engine owns the template (base); the operator's delta lives in an **untracked** overlay at `<vault>/.wiki/custom/<rel>`; the live file is derived as `template ⊕ overlay` (`core.seed.apply_overlay` / `derive`: an element-wise deep merge). This keeps the file engine-updatable (new keys flow in) while preserving customisations — operators edit the overlay, `--force` re-derives from template ⊕ overlay, `wiki seed --extract-custom <rel>` bootstraps an overlay from existing drift. An overlay only overrides: a key or array entry the operator removed, or a value cleared to `null`, comes back from the template on `--force` (`.ytstack/backlog/overlay-cannot-carry-deletions.md`). NEVER make a customisable config keep-or-`--force` whole-file — that recreates the force-vs-drift dilemma.
+- **Accumulating lists (community-plugins, shell-commands, meta-bind buttons):** bespoke additive merges in `core/seed.py` (`union_list`, `merge_registry` by id, `env_appended`), preserving operator entries while adding/updating engine-managed ones.
 
 Drift detection on the JSON configs is key-order-insensitive (the canonical `jq -S` form, `core.jqjson.canonical` in the port), so don't worry about Obsidian re-serialising key order. Copied files (markdown, html, css, yaml) compare byte for byte.
 

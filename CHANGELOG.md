@@ -18,6 +18,26 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.25] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Changed
+
+- **`wiki seed` runs in Python.** Its messages, the files it writes and its exit codes are
+  the same as before. The bash's output was recorded in 29 cases first, and the Python port
+  is held to that record.
+- **`wiki` no longer needs jq.** Seed was its last user. The installer still checks for jq
+  until the next release.
+- `wiki seed --help` prints static text. On a terminal its headings are still bold, but the
+  two dimmed phrases are no longer dimmed.
+
+### Fixed
+
+- An empty `community-plugins.json` or `appearance.json` is now reported as not in the shape
+  seed expects. The bash called such a file up to date, though no engine plugin or snippet
+  was enabled.
+
 ## [0.7.24] — 2026-10-16
 
 **For your vault:** nothing to do.

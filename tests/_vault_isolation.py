@@ -144,6 +144,37 @@ def install_write_guard() -> None:
     os.rmdir = _guard_os("os_rmdir", "os.rmdir()")
 
 
+# ── The layer the patches cannot see: other processes ─────────────────────────
+# A test that runs the engine as a child process (`cli._run_child`, `wiki` itself, flush's
+# timeout-guarded dashboard refresh) writes from an interpreter the patches above never
+# touched. M034-S04-T04: `cli.main(["seed"])` straight from a test seeded a whole vault into
+# the checkout's parent, and a later dashboard refresh rewrote its `_dashboard-*.md`. The
+# session compares the checkout's neighbours before and after (conftest) and fails the run
+# on any change.
+
+_NEIGHBOUR_NOISE = frozenset({".DS_Store", ".stfolder", ".stversions", ".stignore"})
+
+
+def neighbours(parent: Path = ROOT_DIR, checkout: Path = WIKI_DIR) -> dict[str, int]:
+    """The checkout's neighbours at the top level: name → modification time (ns). A sibling
+    repository and the sync noise (Finder, Syncthing) are not the suite's business."""
+    found: dict[str, int] = {}
+    for entry in parent.iterdir():
+        if entry == checkout or entry.name in _NEIGHBOUR_NOISE:
+            continue
+        if ".sync-conflict-" in entry.name:
+            continue
+        if entry.is_dir() and (entry / ".git").exists():
+            continue
+        found[entry.name] = entry.lstat().st_mtime_ns
+    return found
+
+
+def changed_neighbours(before: dict[str, int], after: dict[str, int]) -> list[str]:
+    """The neighbours that appeared, or whose modification time moved, between snapshots."""
+    return sorted(name for name, mtime in after.items() if before.get(name) != mtime)
+
+
 def remove_write_guard() -> None:
     """Restore the unpatched write entry points."""
     if not _ORIGINALS:

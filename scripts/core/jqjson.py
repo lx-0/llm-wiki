@@ -147,15 +147,21 @@ def getpath(value: object, path: JsonPath) -> object:
 
 def setpath(value: object, path: JsonPath, new: object) -> object:
     """jq's `setpath`: a copy of ``value`` with ``new`` at ``path``, creating objects and
-    arrays on the way — an array is padded with nulls up to the index."""
+    arrays from null on the way — an array is padded with nulls up to the index. Like jq, it
+    refuses to index anything else with the wrong kind of key (TypeError: "Cannot index
+    object with number")."""
     if not path:
         return new
     key, rest = path[0], path[1:]
     if isinstance(key, str):
-        obj = dict(value) if isinstance(value, dict) else {}
+        if value is not None and not isinstance(value, dict):
+            raise TypeError(f"cannot index {type(value).__name__} with {key!r}")
+        obj = dict(value or {})
         obj[key] = setpath(obj.get(key), rest, new)
         return obj
-    items = list(value) if isinstance(value, list) else []
+    if value is not None and not isinstance(value, list):
+        raise TypeError(f"cannot index {type(value).__name__} with a number")
+    items = list(value or [])
     items.extend([None] * (key + 1 - len(items)))
     items[key] = setpath(items[key], rest, new)
     return items

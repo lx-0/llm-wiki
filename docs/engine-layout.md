@@ -12,7 +12,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 - [How a module runs](#how-a-module-runs)
 - [Seams and gates](#seams-and-gates)
 - [Large modules](#large-modules)
-- [Why bash + python + jq?](#why-bash--python--jq)
+- [Why bash + python?](#why-bash--python)
 - [Where to go next](#where-to-go-next)
 
 ## Directory tree
@@ -27,7 +27,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── lib/
 │   ├── common.sh              ← paths, the engine-environment rule, output helpers, shell_quote / sync_hint, backup
 │   ├── ui.sh                  ← interactive prompts: confirm for update
-│   └── seed.sh                ← `wiki seed`: template seeding with the overlay, the plugin-list / env merges, the two button registries and the dashboard region
+│   └── seed.sh                ← install.sh's template seeding until M034-S04-T05 (`wiki seed` itself is scripts/seed_cli.py)
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
@@ -179,6 +179,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── hooks_cli.py           ← `wiki hooks install/uninstall/status` — the agent × scope flows over core/agents, a backup before every write, the status table
 │   ├── status_cli.py          ← `wiki status` — `wiki config status` over the hooks table
 │   ├── skills_cli.py          ← `wiki skills install/uninstall/sync/status` — engine-skill links in .claude/skills/, the global opt-in, the vault registry
+│   ├── seed_cli.py            ← `wiki seed [--check|--force] [<path>]`, `--extract-custom` — core/seed's walk and merges with the bash's messages, the dashboard's agent-button region, the refresh after a writing run; refuses a directory without .obsidian/
 │   ├── shortcut_cli.py        ← `wiki install-shortcut` — the `~/.local/bin/wiki` symlink (refuses a non-symlink in the way), the PATH probe
 │   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI
@@ -300,13 +301,14 @@ A module under `scripts/` stays at or under 1,000 lines; one that is larger is l
 - `scripts/collectors/gmeet.py` — one collector whose parts change together: the meeting-pairing rules (title normalisation, meeting key, sibling scan, section render and merge) define the file shape the per-account scan writes and re-reads; the Drive transport already lives in `adapters/drive/google.py`.
 - `scripts/migrations/migrate_config_keys.py` — the one legal write path into an operator's `config.yaml`, named by path in the CLAUDE.md hard rule that every knob change extends it in the same commit; half of it is the declarative migration tables those commits extend, the rest applies them in one fixed order.
 
-## Why bash + python + jq?
+## Why bash + python?
 
-- **bash** for UI and orchestration — selection menus, scope choice, multi-target install.
-- **python** for YAML parsing and config invariants — dataclass-backed, type-coerced, validated.
-- **jq** for JSON merge of agent configs — preserves the user's existing hooks instead of clobbering them.
-
-No yaml-in-bash, no json-in-python. Each tool does what it's good at.
+- **bash** for the bootstrap only: resolve the engine, guard the vault, hop into the venv's
+  Python — and `wiki update`, which pulls the engine it runs from (its port is M034-S05).
+- **python** for everything else, JSON included. The agent-config and seed merges were jq
+  until M034; `core/jqjson.py` now reads, compares and writes JSON the way jq 1.7 did, held
+  byte for byte to the bash's recorded output (`tests/golden/agents/`, `tests/golden/seed/`).
+  `install.sh` still sources `lib/seed.sh` (and needs jq) until M034-S04-T05.
 
 ## Where to go next
 

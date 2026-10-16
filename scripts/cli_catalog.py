@@ -47,6 +47,7 @@ from cli_help import (
     H_RECONCILE,
     H_REINDEX,
     H_REVIEW_WIKI,
+    H_SEED,
     H_SETUP,
     H_SKILLS,
     H_STATS,
@@ -209,7 +210,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         help_text=H_INSTALL_SHORTCUT,
     ),
     CommandSpec("update", "Setup", "git pull --ff-only + sync deps/skills", kind="bash", menu=True),
-    CommandSpec("seed", "Setup", "re-apply engine templates to the vault", kind="bash", menu=True),
+    CommandSpec(
+        "seed",
+        "Setup",
+        "re-apply engine templates to the vault",
+        handler="seed_cli.py",
+        banner=False,  # the handler prints its own: the mode line, or --extract-custom's
+        menu=True,
+        help_text=H_SEED,
+    ),
     # Collect & ingest
     CommandSpec(
         "collect",

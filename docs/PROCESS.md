@@ -913,7 +913,7 @@ Maps of Content sind hand-kuratierte Topic-Hubs unter `knowledge/MOCs/`. Sie bü
 | Verzeichnis | `knowledge/MOCs/` |
 | Frontmatter | `type: moc` (gelintet von `check_article_type`) |
 | Seed-Stubs | `people.md`, `projects.md`, `concepts.md` (siehe `templates/knowledge/MOCs/`) |
-| Seed-Mechanik | `lib/seed.sh:seed_vault_templates` Step 4b — additiv (überschreibt operator-edits nicht) |
+| Seed-Mechanik | `scripts/core/seed.py:walk` (kind `copy`) — additiv (überschreibt operator-edits nicht) |
 | Dashboard-Wiring | `dashboard.md` Section "## 🗂 MOCs" — `dataview LIST FROM "knowledge/MOCs"`, neue MOCs auto-appear |
 
 **Operator-Workflow**:
@@ -988,7 +988,7 @@ uv run python -c "import sys; sys.path.insert(0, 'scripts'); from core.utils imp
 | `properties` | DisplayName-Mapping für `type`, `file.name`, `file.mtime` |
 | `views` | 2 Tabellen — "All knowledge" (mtime DESC, limit 200) + "By type" (grouped) |
 
-**Seed-Mechanik**: `lib/seed.sh:seed_vault_templates` step 2b kopiert die .base additiv nach `target/knowledge.base`. Operator-Edits bleiben erhalten ohne `--force`.
+**Seed-Mechanik**: `scripts/core/seed.py:walk` listet die .base als `copy`; `wiki seed` kopiert sie additiv nach `target/knowledge.base`. Operator-Edits bleiben erhalten ohne `--force`.
 
 **Dashboard-Wiring**: `dashboard.md` Section "## 🗃 Browse knowledge" linkt via `[[knowledge.base|Open knowledge browser]]`. Embed (`![[knowledge.base]]`) wäre möglich, ist aber bewusst weggelassen — Bases-Render ist schwerer als Dataview, Dashboard soll snappy bleiben.
 
@@ -1197,12 +1197,12 @@ Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
 
 `scripts/dashboard/agent_buttons.py` discovered alle `prompts/agents/*.md` mit `button:` Frontmatter und liefert pro Button einen Shell-commands-Eintrag (`agent-<id>`, Alias `Wiki: agent <id>`) und ein Meta-Bind-Button-Template (`btn-<id>`). Ein Dashboard-Button braucht beide: Meta-Bind löst `` `BUTTON[id]` `` seit 1.4 nur noch gegen die `buttonTemplates` seiner `data.json` auf (Definitionen in eingebetteten Notizen zählen nicht mehr), und der Button führt den Shell-commands-Befehl über dessen Palette-Namen aus, den Alias. `lib/seed.sh` verdrahtet auf zwei Pfaden:
 
-1. **Merge in die zwei Plugin-Register:** `_merge_registry()` merged die Engine-Einträge per id in `shell_commands` (`.obsidian/plugins/obsidian-shellcommands/data.json`) und `buttonTemplates` (`.obsidian/plugins/obsidian-meta-bind-plugin/data.json`). Engine-Einträge = die des Templates plus die generierten; die Templates tragen keine Agent-Einträge (`tests/test_agent_buttons.py` hält sie dazu an — eine Template-Kopie driftete: `btn-dream-cycle` stand im Dashboard und in keinem Register).
+1. **Merge in die zwei Plugin-Register:** `core/seed.py:merge_registry` merged die Engine-Einträge per id in `shell_commands` (`.obsidian/plugins/obsidian-shellcommands/data.json`) und `buttonTemplates` (`.obsidian/plugins/obsidian-meta-bind-plugin/data.json`). Engine-Einträge = die des Templates plus die generierten; die Templates tragen keine Agent-Einträge (`tests/test_agent_buttons.py` hält sie dazu an — eine Template-Kopie driftete: `btn-dream-cycle` stand im Dashboard und in keinem Register).
    - Ein Eintrag mit Engine-id übernimmt die Felder der Engine **an Ort und Stelle**. Felder, die die Engine nicht ausliefert, bleiben: die des Plugins (`debounce`, `execution_notification_mode`) und die des Operators.
    - Fehlende Engine-Einträge werden angehängt; alle anderen Einträge bleiben unberührt, samt Reihenfolge.
    - Fehlt die Datei, wird sie als Template plus Engine-Einträge angelegt.
    - Geschrieben wird nur bei echter Änderung. `--check` sagt, was hinzukäme oder aktualisiert würde.
-2. **Dashboard Region-Replace:** `_rewrite_dashboard_agent_buttons()` ersetzt den Bereich `<!-- agent-buttons:begin -->` ... `<!-- agent-buttons:end -->` in `dashboard.md` durch die inline `` `BUTTON[id]` `` Referenzen. Das Template trägt sie schon so, wie Seed sie schreibt — sonst gälte jedes `dashboard.md` ab dem zweiten Seed als „drifted“.
+2. **Dashboard Region-Replace:** `seed_cli.Seeder.dashboard_buttons` (`agent_buttons.update_dashboard`) ersetzt den Bereich `<!-- agent-buttons:begin -->` ... `<!-- agent-buttons:end -->` in `dashboard.md` durch die inline `` `BUTTON[id]` `` Referenzen. Das Template trägt sie schon so, wie Seed sie schreibt — sonst gälte jedes `dashboard.md` ab dem zweiten Seed als „drifted“.
 
 Idempotent — zweiter Lauf produziert keinen Diff.
 

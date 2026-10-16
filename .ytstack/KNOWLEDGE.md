@@ -3479,3 +3479,26 @@ The CHANGELOG lists what seed reported wrongly. Two of the causes generalise:
 
 6. **A silent fallback can invert what an input is for.** `_apply_overlay` fell back to the bare template when the overlay was not valid JSON. With `--force`, that fallback wrote the template over the very file the overlay exists to keep, and the message still said "template⊕overlay". An input that cannot be read is a stop with its name in the message, never the "no input" case.
 7. **`set -e` plus `x="$(cmd)"` exits with cmd's status and says nothing.** `--extract-custom` on a file that was not JSON ended with exit 2 and an empty stderr: jq failed inside `local delta; delta="$(…)"`. Validate the input before the substitution, and give the reason (`_is_json` → `err`).
+
+## A test that calls `cli.main` with a ported command runs it for real, next to the checkout (2026-10-16, M034-S04-T04)
+
+### What happened
+
+`tests/test_cli.py::test_main_refuses_bash_native_commands` asserted `cli.main(["seed"]) == 1`, since seed was bash-native. After the port, that call dispatched the real handler. `cli._run_child` started `seed_cli.py` as a child process, and in a dev checkout its `ROOT_DIR` is the checkout's parent, here `projects/lx-0/`.
+
+The child seeded a whole vault there: 31 files, `.obsidian/` and `.claude/` included. Its dashboards refresh then wrote `_dashboard-*.md`. A later red test run of `seed_cli.main([])` rewrote those caches again, through flush's child process.
+
+### Why the guard did not catch it
+
+`tests/_vault_isolation.py` patches the write entry points of the test process. A child process is another interpreter, so it never saw the patches. Two child paths leaked: `cli._run_child`, and flush's timeout-guarded refresh.
+
+### Fix
+
+- **The test names `update`, the one bash-native command left.** Its docstring says never to name a ported command there.
+- **`seed_cli` refuses a directory without `.obsidian/`,** with the message of the bash `require_vault`. A direct call can no longer seed a non-vault.
+- **A session guard in `conftest.py`** (`pytest_sessionstart` / `pytest_sessionfinish`) compares the checkout's neighbours before and after the run and fails the session on any change, whichever process made it. Sibling repositories and Finder/Syncthing noise are ignored. It is tested in `tests/test_vault_isolation.py`.
+- **The cleanup of the 31 files was left to the operator** (`/tmp/cleanup-stray-seed.sh`). The deletion was blocked as irreversible. The script deletes only files whose creation time matches that run.
+
+### Lesson
+
+A port changes what every *refusal* test exercises. A test that pinned "this command is not ours" runs the command once it is ours. Grep the tests for the ported name before the switch, and give any guard against stray writes a session-level check, because child processes escape in-process patching.
