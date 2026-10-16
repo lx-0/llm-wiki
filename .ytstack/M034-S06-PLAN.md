@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M034-S06 -- Slice Plan
@@ -29,7 +29,7 @@ completed_tasks: 2
 - [x] T02 -- `print` → `core/console` across the command modules. A gate refuses `print(` in
   command modules outside an allowlist with reasons (JSON payload writers and the TUI frame
   writer among them). The count goes before → after; `--json` stays payload-only.
-- [ ] T03 -- Collectors, the registry: a name → module table with lazy registration.
+- [x] T03 -- Collectors, the registry: a name → module table with lazy registration.
   Importing the `collectors` package imports no collector module, and `wiki collect <name>`
   imports only its own, both guarded by tests.
 

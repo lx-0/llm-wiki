@@ -4,7 +4,7 @@ slug: llm-wiki
 last_updated: 2026-10-16T04:25:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: T03
+active_task: T04
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,15 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 / S06 / T03 planned — ready to execute (`M034-S06-T03-PLAN.md`: the
-collector registry as a lazy name → module table; `--list` keeps importing every collector for
-the desktop's `configured`, exit criterion 6 amended with the measurement). S06 re-cut to 7
-tasks (collectors: registry T03, verb T04). S06: 2/7 done. Slices S01–S05 are complete (5/6).
+**Status:** M034 / S06 / T04 planned — ready to execute (`M034-S06-T04-PLAN.md`: `wiki
+collect <name> -- <flags>` into the collectors' `main(argv)`, the three by-path entry scripts
+deleted, PROCESS.md's 11 bare `uv run --project .wiki` lines become `wiki` commands incl.
+`refresh-dashboards [--dry-run]`). S06: 3/7 done. Slices S01–S05 are complete (5/6).
+
+T03 closed (`M034-S06-T03-SUMMARY.md`): the collector registry is a lazy table
+(`collectors.MODULES`). `import collectors` takes 0.014 s, from 0.07 s, and
+`get_collector(name)` imports one module. `--list` imports every collector, for the desktop's
+`configured`. Exit criterion 6 is amended with the measurement (DECISIONS 2026-10-16).
 
 T02 closed (`M034-S06-T02-SUMMARY.md`): one output path. `core.console.say` replaces the 391
 `print(` calls in 36 command modules, and an AST gate refuses a new one. No output byte
