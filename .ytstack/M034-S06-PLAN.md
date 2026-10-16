@@ -58,3 +58,25 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`; all nine exit 
 
 The arc ends here. What the arc table left out (§8: the excalidraw diagrams, signing and
 auto-update, the ytstack process files) stays out.
+
+**What S05 taught for this slice** (reassessment after S05, outcome A: the slice order
+holds):
+- **Exit criteria 1 and 8 are met.** `wiki` is a 129-line bootstrap with no library
+  (`test_bash_budget.py`), and the operator path ran on scratch (`M034-S05-T06-SUMMARY.md`).
+  T05's DECISIONS entry cites them, with T06's open caveat: the LLM round trip could not run
+  under a sandboxed HOME.
+- **T02's print gate has a seam already.** Every help text goes through
+  `cli_help.print_help`, a print site the gate allowlists with its reason (T04 refuses any
+  other `print(H_…)`).
+- **A seam guard scans every engine file, not only `*.py`.** S05-T02's grammar guard missed
+  a copy in `wiki` until it looked at the bash too. T01's "no menu entry without a
+  catalogue command" and T02's gate should not leave the TUI or the desktop's spawn args out
+  by file type.
+- **A port that touches about ten files splits at its natural seam.** Update split by phase,
+  and the intermediate state was the cross-version path itself. T03's collector registry
+  can split the same way: the table and lazy listing first, then the verb's pass-through.
+- **Goldens hold the steady state; transitions are asserted.** Where a record would move
+  with unrelated config (the migration's 120 keys), prepare the steady state and assert the
+  change separately.
+- **New backlog for T06's fan-out:** `update-hooks-hint-only-when-stale.md`,
+  `compile-exit-code-on-failure.md`.

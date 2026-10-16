@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T04:05:00+02:00
+last_updated: 2026-10-16T04:25:00+02:00
 current_milestone: M034
-active_slice: S05
-active_task: T05
+active_slice: S06
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,12 +12,26 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S05: update + the last bash
+## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 / S05 / T05 planned — ready to execute (`M034-S05-T05-PLAN.md`:
-`lib/common.sh` folds into `wiki` (≤ 150 lines, a budget test), `lib/` gone; the cloud rule's
-two copies held to one table; install.sh lets the first `wiki` call create the environment and
-links skills via `wiki skills sync`). S05: 4/6 done. Slices S01–S04 are complete (4/6).
+**Status:** M034 -- slice S05 complete (6/6) and reassessed (A: the order holds; S05's
+lessons are in S06's plan notes). Next slice: S06 (`M034-S06-PLAN.md`, 6 tasks: one table
+behind help and menu, the print gate, the collector registry, README/AGENTS budgets, 0.8.0,
+the milestone close). Run `/ytstack:plan-task` for S06-T01. Slices S01–S05 are complete (5/6).
+
+T06 closed (`M034-S05-T06-SUMMARY.md`, passed with caveats): the operator path ran end to end
+on scratch from the real 0.7.3 installer. That covered the update, the desktop's spawns, the
+Obsidian buttons after `wiki seed`, the shortcut, and setup on a fresh vault. It found no
+defect in the S05 head.
+- **Caveat:** every LLM step stops at the Claude CLI's login under a sandboxed HOME, so the
+  compile's round trip is the operator's next real compile.
+- **Backlog:** `compile-exit-code-on-failure.md`.
+
+T05 closed (`M034-S05-T05-SUMMARY.md`): the bash is one file, `wiki` (129 lines, no library;
+0.7.31).
+- The cloud rule's two copies are held to one table.
+- install.sh lets the first `wiki` call create and stamp the environment, so there is no
+  second sync.
 
 T04 closed (`M034-S05-T04-SUMMARY.md`): one help system (0.7.30).
 - `cli_help.print_help` sits behind the dispatcher and the five handlers.

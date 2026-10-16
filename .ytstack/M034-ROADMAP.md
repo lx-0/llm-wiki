@@ -5,7 +5,7 @@ size: L
 created: 2026-10-15T18:13:20+02:00
 status: planned
 total_slices: 6
-completed_slices: 4
+completed_slices: 5
 ---
 
 # M034 Roadmap
@@ -59,11 +59,13 @@ and three tables.
   meta-bind and dashboard-button merges, at parity on the fixture vault and a copy of the live
   `.obsidian/`; `lib/seed.sh` retires. Done: seven releases on the way (0.7.20–0.7.26), jq
   gone from the engine, the bash layer at 427 lines.
-- [ ] S05 -- **Update + the last bash** (6 tasks; update's port split by phase at planning).
+- [x] S05 -- **Update + the last bash** (6 tasks; update's port split by phase at planning).
   `update` with the post-pull re-exec of
   the pulled engine, proven 0.7.3 → M034 on a scratch clone. `lib/common.sh` and `lib/ui.sh`
   retire, and `wiki` lands at ≤ 150 lines. One help system: the bash help texts move into
-  `cli_help` (`cmd_help` went in S01-T05).
+  `cli_help` (`cmd_help` went in S01-T05). Done: five releases (0.7.27–0.7.31). Update is
+  Python, and a real 0.7.3 bash hands over to it. `wiki` is a 129-line bootstrap with no
+  library. The operator path ran on scratch.
 - [ ] S06 -- **Surface diet + close** (6 tasks).
   - One table behind help and menu; `print` → `core/console` with its gate; the lazy
     collector registry and the collect verb.

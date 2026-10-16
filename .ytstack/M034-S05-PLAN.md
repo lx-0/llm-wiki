@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 4
+completed_tasks: 6
 ---
 
 # M034-S05 -- Slice Plan
@@ -40,11 +40,11 @@ and `wiki` is the ≤ 150-line bootstrap, behind one help system.
   `config` / `setup` in S02, `hooks` / `skills` in S03, `update` in T03 (`cmd_help` already
   went in S01-T05). This task checks that no bash help text is left, pins that with a test (no
   `help_*` heredoc in `wiki`), and makes `wiki help` and `wiki <cmd> -h` render from one place.
-- [ ] T05 -- `lib/common.sh` is deleted (`lib/ui.sh` went in T03), and the iCloud venv rule
+- [x] T05 -- `lib/common.sh` is deleted (`lib/ui.sh` went in T03), and the iCloud venv rule
   moves into the bootstrap.
   `wiki` is ≤ 150 lines, and a test pins the bash budget (`wiki` line count; no `lib/*.sh`).
   `install.sh` is re-checked against the new layout.
-- [ ] T06 -- Operator path, end to end on a scratch vault at 0.7.3:
+- [x] T06 -- Operator path, end to end on a scratch vault at 0.7.3:
   - `wiki update` to the S05 head;
   - then the desktop's spawn path, the Obsidian buttons, the shortcut symlink, `wiki setup`
     on a fresh vault, and one compile;

@@ -3521,3 +3521,13 @@ A port changes what every *refusal* test exercises. A test that pinned "this com
 3. **Another tool's wording is switched off in the fixture** (`advice.diverging=false`), not recorded.
 4. **A second copy of a judgment drifts.** The port calls one walker for the hook-environment check, shared with `wiki doctor`'s `check_hooks_installed`; the bash's line-by-line grep only had to hold until then.
 5. **The interpreter's name is the platform's.** The cloud records showed the uv shim's link to `sys.executable`, which is `.venv/bin/python3` in a uv venv on macOS and `.venv/bin/python` on the CI runner. `3166f30` went red on CI for that alone. One machine's look at `sys.executable` (and at the pytest shebang) proved nothing about the other. The interpreter is a placeholder now, `<PYTHON>`.
+
+## An iCloud vault installed before 0.7.31 can carry a stray in-vault `.venv` (2026-10-16, M034-S05-T06)
+
+The operator path on scratch (the real 0.7.3 installer, into an iCloud-shaped path) left two environments: `~/.venvs/<vault>-wiki`, as the rule says, and `.wiki/.venv` inside the vault.
+
+The cause was the installer's order. It seeded the vault templates before its venv block exported `UV_PROJECT_ENVIRONMENT`, and the seed's dashboard step ran `uv run --project .wiki`. With nothing exported, uv's default built `.wiki/.venv` inside the cloud folder.
+
+- **What the operator sees:** `wiki update` and `wiki doctor` report it as a stale in-vault environment and print the `rm -rf` line. It is never auto-deleted (DECISIONS 2026-09-17).
+- **Why it cannot recur:** since 0.7.31 (M034-S05-T05) the installer builds no environment. Its first `wiki` call applies the rule. `tests/test_install.py::test_an_install_into_a_cloud_vault_keeps_the_environment_outside_it` pins that.
+- **Lesson:** a rule that decides where state goes must hold before the first command that creates state. A rule exported halfway through a script governs only what comes after it.
