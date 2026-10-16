@@ -214,7 +214,6 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "update",
         "Setup",
         "git pull --ff-only + sync deps/skills",
-        # the second phase (`--post-pull <rev>`); the pull is the bash's until M034-S05-T03
         handler="update_cli.py",
         banner=False,
         menu=True,

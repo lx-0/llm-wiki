@@ -407,8 +407,8 @@ def run_wiki(
 ) -> subprocess.CompletedProcess[str]:
     """Run the engine copy's `wiki` the way a non-interactive caller does: no TTY, a
     scratch HOME, PATH = the uv shim + the system dirs (where `jq` and `git` live on macOS
-    and on the CI runner). ``stdin`` scripts the answers to the bash's line-based prompts
-    (`lib/ui.sh` reads with `read -r`, and EOF takes the default); without it stdin is
+    and on the CI runner). ``stdin`` scripts the answers to the line-based prompts (the
+    bash's `read -r`, `core.console.read_line` since the ports; EOF takes the default); without it stdin is
     /dev/null. ``extra_env`` adds variables (a test's probe paths, an operator's
     `UV_PROJECT_ENVIRONMENT`). With ``tty``, stdin is a terminal (a pty) that ``stdin`` is
     typed into: `wiki update` asks before stashing only when stdin is one. Its echo stays

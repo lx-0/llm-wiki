@@ -2372,7 +2372,7 @@ Reusable lessons:
 
 ### `git apply --check` is the safe pre-flight for stash re-apply (2026-05-24)
 
-**Context:** `wiki update` (`cmd_update` in `wiki`) does `git pull --ff-only` on the `.wiki/` checkout. A dirty tree (direct edits to *tracked* engine files — the "zombie-modified" case) aborts the pull. New behavior: detect via `git diff --quiet || git diff --cached --quiet`, offer to stash, pull, then re-apply.
+**Context:** `wiki update` (`cmd_update` in `wiki`; since M034-S05-T03 `scripts/update_cli.py`) does `git pull --ff-only` on the `.wiki/` checkout. A dirty tree (direct edits to *tracked* engine files — the "zombie-modified" case) aborts the pull. New behavior: detect via `git diff --quiet || git diff --cached --quiet`, offer to stash, pull, then re-apply.
 
 **The footgun avoided:** the obvious "re-apply" is `git stash pop`. But `stash pop` on conflict applies the changes WITH conflict markers into the working tree AND keeps the stash — leaving the checkout half-merged mid-update. Cleaning that up means `git reset --hard` (globally banned here; and even though the stash preserves the data, it's a fragile path).
 
@@ -2818,7 +2818,9 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `exec "$WIKI_DIR/wiki" update --post-pull <rev>`, phase two (`_update_post_pull`) runs from
   the pulled tree. `tests/test_wiki_update.py` pins both halves with real git + the real bash
   layer and a logging `uv` stub. The one update that still runs the old bash (the operator's
-  first after this change) is bounded: two warnings, then `wiki update` once more.
+  first after this change) is bounded: two warnings, then `wiki update` once more. Since
+  M034-S05-T02 / T03 both halves are `scripts/update_cli.py` (`pull` ends in `_handover`'s
+  `execv`, `post_pull` is phase two), and every bash since 0.7.3 hands over the same way.
 - **`wiki <cmd> --help` never spawns the handler (M033-S02-T05):** cli.py answers `--help`
   from the CommandSpec's `help_text`, so a `--help` smoke proves the dispatcher, not the
   spawn. `wiki ingest-youtube --help` was clean while every real `wiki ingest-youtube …` and

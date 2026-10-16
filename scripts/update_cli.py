@@ -1,21 +1,16 @@
-"""`wiki update --post-pull <rev> [--no-skills]` (M034-S05-T02) — everything after the pull.
+"""`wiki update [--no-skills]` (M034-S05-T02 / T03) — pull the engine, then run everything
+after the pull from the engine just pulled.
 
-The first phase pulls the engine and then re-executes the PULLED engine's `wiki` with
-`update --post-pull <rev before the pull>`, so these steps always come from the new tree: a
-changed step takes effect in the update that brought it, not the next one. That phase is
-still the bash's `cmd_update` until T03, and a 0.7.3 bash pulling this engine re-executes
-into it exactly so.
+Phase 1 guards the checkout, stashes hand edits to tracked engine files on request, pulls
+with `--ff-only` and re-applies the stash where it applies cleanly. Then it re-executes the
+PULLED engine's `wiki` with `update --post-pull <rev before the pull>`. Phase 2 is that run:
+the summary line, `uv sync`, the cloud-vault hints, both migrations and the skills sync. It
+always comes from the new tree, so a changed step takes effect in the update that brought it,
+not the next one. Every engine since 0.7.3 hands over the same way, its bash phase 1 included.
 
-The steps, in the bash `_update_post_pull`'s order and words (it is recorded in
-tests/golden/bash/update-*.txt, and every line there holds):
-- the summary line;
-- `uv sync` of the engine's environment;
-- for an environment outside the vault, where it is, an in-vault one left behind, and hooks
-  still running that one;
-- the config.yaml and operations-log migrations, as modules of this engine;
-- the skills sync, unless `--no-skills`.
-
-Each step's failure is a warning. The update is done by then, and the exit code stays 0.
+The bash `cmd_update` this replaced (deleted in T03, with lib/ui.sh) is recorded in
+tests/golden/bash/update-*.txt, the stash path through a pty, and every line there holds.
+Each failure after the pull is a warning: the update is done by then.
 """
 
 from __future__ import annotations
@@ -23,11 +18,14 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import NoReturn
 
 import skills_cli
+from cli_help import H_UPDATE
 from core import agents
-from core.console import fail, info, ok, print_error, warn
+from core.console import confirm, fail, info, ok, print_error, warn
 from core.paths import ROOT_DIR, WIKI_DIR
 
 _ENV = "UV_PROJECT_ENVIRONMENT"
@@ -39,9 +37,119 @@ def _git(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _run(argv: list[str], env: dict[str, str] | None = None) -> int:
+    """A child's exit code; this process's lines go out first, so a pipe keeps their order."""
+    sys.stdout.flush()
+    return subprocess.run(argv, env=env, check=False).returncode
+
+
 def _dim(text: str) -> str:
     """The bash's `${C_DIM}…${C_RESET}`, set when stdout is a terminal."""
     return f"\033[2m{text}\033[0m" if sys.stdout.isatty() else text
+
+
+# ── phase 1: the pull ──────────────────────────────────────────────────────────
+
+
+def _stash() -> bool | None:
+    """The dirty-tree guard. `git pull --ff-only` aborts on local edits to tracked engine
+    files (config.yaml, state/ and logs/ are gitignored, so these are real edits inside
+    .wiki/), so offer to stash them out of the way rather than fail with "resolve manually".
+    Untracked files stay untouched (no `stash -u`). True when stashed, False when the tree
+    is clean, None after a refusal, which is reported."""
+    if not (_git("diff", "--quiet").returncode or _git("diff", "--cached", "--quiet").returncode):
+        return False
+    warn(f"Uncommitted changes in {WIKI_DIR} (tracked engine files):")
+    _run(["git", "-C", str(WIKI_DIR), "status", "--short", "--untracked-files=no"])
+    if not sys.stdin.isatty():
+        fail(
+            "Refusing to touch them non-interactively. Run `wiki update` from a terminal to "
+            f"stash, or commit/stash manually in {WIKI_DIR}."
+        )
+        return None
+    # on stdout, where the bash's prompt was
+    if not confirm("Stash these changes, update, then re-apply them?", False, out=sys.stdout):
+        fail(
+            "Update aborted — uncommitted changes left in place. Commit or stash them, then "
+            "re-run `wiki update`."
+        )
+        return None
+    message = f"wiki-update auto-stash {time.strftime('%Y-%m-%d-%H%M%S')}"
+    if _run(["git", "-C", str(WIKI_DIR), "stash", "push", "-m", message]):
+        fail(f"git stash failed. Resolve manually in {WIKI_DIR}.")
+        return None
+    ok("Stashed local changes (will re-apply after the pull if they merge cleanly).")
+    return True
+
+
+def _pull(stashed: bool) -> bool:
+    info(f"Pulling latest into {WIKI_DIR} …")
+    if not _run(["git", "-C", str(WIKI_DIR), "pull", "--ff-only"]):
+        return True
+    # Not a fast-forward, or no network: HEAD did not move, so a stash made for this pull
+    # pops cleanly back, and the operator's edits are not left hidden by a failed update.
+    if stashed:
+        if _git("stash", "pop").returncode == 0:
+            warn("Restored your stashed changes (pull did not run).")
+        else:
+            warn(f'Could not auto-restore stash — recover with: git -C "{WIKI_DIR}" stash pop')
+    fail(f"git pull failed (non-fast-forward or network). Resolve manually in {WIKI_DIR}.")
+    return False
+
+
+def _reapply() -> None:
+    """The stash goes back onto the pulled engine only if it applies cleanly. `git apply
+    --check` decides first, so a conflict leaves the stash unpopped (recoverable) instead of
+    conflict markers in the checkout mid-update. The check errs safe. Bytes throughout: a
+    patch need not be UTF-8."""
+    git = ["git", "-C", str(WIKI_DIR)]
+    patch = subprocess.run(
+        [*git, "stash", "show", "-p", "stash@{0}"], capture_output=True, check=False
+    )
+    applies = (
+        patch.returncode == 0
+        and subprocess.run(
+            [*git, "apply", "--check", "-"], input=patch.stdout, capture_output=True, check=False
+        ).returncode
+        == 0
+    )
+    if not applies:
+        warn("Stashed changes would conflict with the update — left unpopped.")
+        warn(f'  recover with: git -C "{WIKI_DIR}" stash pop  (then resolve conflicts)')
+    elif _git("stash", "pop").returncode == 0:
+        ok("Re-applied your stashed changes cleanly.")
+    else:
+        warn("Stash re-apply failed unexpectedly — your changes are still stashed.")
+        warn(f'  recover with: git -C "{WIKI_DIR}" stash pop')
+
+
+def _handover(before: str, *, sync_skills: bool) -> NoReturn:
+    """Everything after the pull runs from the engine just pulled, not from this code, which
+    was loaded before it. 2026-10-14: the pre-M033-S02 bash spawned the migrations by file
+    path, the pulled tree runs them only as modules, and the first update across that change
+    warned `ModuleNotFoundError: core` and skipped the config migration."""
+    entry = str(WIKI_DIR / "wiki")
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os.execv(
+        entry, [entry, "update", "--post-pull", before, *([] if sync_skills else ["--no-skills"])]
+    )
+
+
+def pull(*, sync_skills: bool) -> int:
+    stashed = _stash()
+    if stashed is None:
+        return 1
+    head = _git("rev-parse", "--short", "HEAD")
+    before = head.stdout.strip() if head.returncode == 0 else "unknown"
+    if not _pull(stashed):
+        return 1
+    if stashed:
+        _reapply()
+    _handover(before, sync_skills=sync_skills)
+
+
+# ── phase 2: from the pulled engine ───────────────────────────────────────────
 
 
 def sync_hint(venv: str | None) -> str:
@@ -94,12 +202,6 @@ def _environment(venv: str) -> None:
             f"hooks still run the engine from the in-vault environment: {', '.join(stale)}"
             " — re-run: wiki hooks install"
         )
-
-
-def _run(argv: list[str], env: dict[str, str] | None = None) -> int:
-    """A child's exit code; this process's lines go out first, so a pipe keeps their order."""
-    sys.stdout.flush()
-    return subprocess.run(argv, env=env, check=False).returncode
 
 
 def _migrate(module: str, *args: str) -> bool:
@@ -160,17 +262,14 @@ def main(argv: list[str] | None = None) -> int:
         arg = args.pop(0)
         if arg == "--no-skills":
             sync_skills = False
-        elif arg == "--post-pull":
+        elif arg == "--post-pull":  # internal: phase 2, with the revision from before the pull
             before = args.pop(0) if args else ""
+        elif arg in ("-h", "--help", "help"):  # anywhere, as the bash's flag loop took it
+            print(H_UPDATE)
+            return 0
         else:
             fail(f"unknown flag: {arg}")
             return 1
-    if before is None:
-        # the pull is the bash's `cmd_update` until M034-S05-T03: nothing here may pull
-        print_error(
-            "update: the pull runs from the `wiki` entry; this is its second phase (--post-pull <rev>)"
-        )
-        return 1
     # Ask git, don't stat `.git`: it is a file when the checkout is a linked worktree, a
     # submodule, or has its git-dir relocated (to keep 770 MB of packfiles out of iCloud).
     if _git("rev-parse", "--git-dir").returncode != 0:
@@ -178,7 +277,9 @@ def main(argv: list[str] | None = None) -> int:
             f"Not a git checkout — {WIKI_DIR} wasn't installed via install.sh. Manual update required."
         )
         return 1
-    return post_pull(before, sync_skills=sync_skills)
+    if before is not None:
+        return post_pull(before, sync_skills=sync_skills)
+    return pull(sync_skills=sync_skills)
 
 
 if __name__ == "__main__":

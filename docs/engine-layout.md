@@ -19,14 +19,13 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 ```text
 .wiki/
-├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard + the commands not yet ported (M034); everything else — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version, the dream routing, the OAuth aliases — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
+├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard; every command — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version, update, the dream routing, the OAuth aliases — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
 ├── install.sh                 ← one-liner installer (also re-runnable from a checkout)
 ├── config.example.yaml        ← tracked  ── │ copy at install time
 ├── config.yaml                ← gitignored ─┘
 ├── pyproject.toml + uv.lock
 ├── lib/
-│   ├── common.sh              ← the engine-environment rule (wiki_venv_dir), output helpers, shell_quote / sync_hint, require_cmd
-│   └── ui.sh                  ← interactive prompts: confirm for update
+│   └── common.sh              ← the engine-environment rule (wiki_venv_dir), output helpers, shell_quote / sync_hint, require_cmd
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
@@ -179,7 +178,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── status_cli.py          ← `wiki status` — `wiki config status` over the hooks table
 │   ├── skills_cli.py          ← `wiki skills install/uninstall/sync/status` — engine-skill links in .claude/skills/, the global opt-in, the vault registry
 │   ├── seed_cli.py            ← `wiki seed [--check|--force] [<path>]`, `--extract-custom` — core/seed's walk and merges with the bash's messages, the dashboard's agent-button region, the refresh after a writing run; refuses a directory without .obsidian/
-│   ├── update_cli.py          ← `wiki update`'s second phase (`--post-pull <rev>`), run from the engine just pulled: the summary line, `uv sync`, the cloud-vault hints, both migrations as child modules, the skills sync (the pull is still `wiki`'s `cmd_update`)
+│   ├── update_cli.py          ← `wiki update [--no-skills]` — the dirty-tree guard (a stash offered on a terminal), the `--ff-only` pull, the clean-only re-apply, then an `execv` of the pulled engine's `wiki update --post-pull <rev>`: the summary line, `uv sync`, the cloud-vault hints, both migrations as child modules, the skills sync
 │   ├── shortcut_cli.py        ← `wiki install-shortcut` — the `~/.local/bin/wiki` symlink (refuses a non-symlink in the way), the PATH probe
 │   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI

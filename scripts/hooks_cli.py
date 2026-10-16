@@ -3,8 +3,8 @@ lib/agents.sh, held to the bash oracle's hooks-* / status / setup-with-hooks gol
 
 Agent configs change the way the bash changed them, with core/agents' merge and uninstall
 filter (byte-identical to its jq). Every write is backed up first (core/backup, never over
-an earlier backup) and lands through a temp file. The prompts follow lib/ui.sh: the pickers
-on stderr, the confirmation on stdout. They read byte by byte, so `wiki setup` runs the
+an earlier backup) and lands through a temp file. The prompts follow the bash's (the
+deleted lib/ui.sh): the pickers on stderr, the confirmation on stdout. They read byte by byte, so `wiki setup` runs the
 install in-process on the same piped stdin.
 
 One decided difference: the table counts a config as installed when an entry under its

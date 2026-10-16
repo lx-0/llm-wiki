@@ -7,101 +7,29 @@ tree, or a changed spawn shape / a new step only takes effect on the *next* upda
 spawned `migrations/migrate_config_keys.py` by file path, the pulled tree runs it only as a
 module, and the first update warned `ModuleNotFoundError: core` and skipped the migration.
 
-Phase 1, the pull, is still the bash's until M034-S05-T03. Phase 2, `--post-pull`, is
-`scripts/update_cli.py` since T02, so its tests run a real engine copy (the bash oracle's
-template) behind the oracle's `uv` shim, which logs how uv was called and syncs nothing.
-The re-exec test keeps a bare bash world: the pulled `wiki` it hands over to is a stub.
+Both phases are `scripts/update_cli.py` (M034-S05-T02 / T03). The tests run a real engine
+copy (the bash oracle's template) behind the oracle's `uv` shim, which logs how uv was
+called and syncs nothing; the bash oracle's update records hold the rest.
 """
 
 from __future__ import annotations
 
-import os
-import re
 import shlex
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from ._oracle import build_engine_template, install_engine, run_wiki, write_uv_shim
+from ._oracle import (
+    build_engine_template,
+    git,
+    install_engine,
+    run_wiki,
+    track_local_origin,
+    write_uv_shim,
+)
 
-REPO = Path(__file__).resolve().parent.parent
-BASH_LAYER = (
-    "wiki",
-    "lib",
-)  # everything the dispatcher sources; phase 1 needs nothing else
 MARKER = "POST-PULL-FROM-PULLED-WIKI"
-_GIT_IDENTITY = {
-    "GIT_AUTHOR_NAME": "t",
-    "GIT_AUTHOR_EMAIL": "t@example.invalid",
-    "GIT_COMMITTER_NAME": "t",
-    "GIT_COMMITTER_EMAIL": "t@example.invalid",
-}
-
-
-def _git(*args: str, cwd: Path) -> str:
-    return subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        check=True,
-        capture_output=True,
-        text=True,
-        env={**os.environ, **_GIT_IDENTITY},
-    ).stdout.strip()
-
-
-# ── phase 1 hands over to the pulled engine ─────────────────────────────────────
-
-
-def test_post_pull_steps_run_from_the_pulled_wiki(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """origin moves on and its `wiki` becomes a stub that announces itself; the update
-    started by the OLD bash must hand over to that stub for everything after the pull."""
-    origin = tmp_path / "origin"
-    origin.mkdir()
-    for name in BASH_LAYER:
-        src = REPO / name
-        if src.is_dir():
-            shutil.copytree(src, origin / name)
-        else:
-            shutil.copy2(src, origin / name)
-    _git("init", "-q", "-b", "main", cwd=origin)
-    _git("add", "-A", cwd=origin)
-    _git("commit", "-q", "-m", "base", cwd=origin)
-    vault = tmp_path / "vault"
-    (vault / ".obsidian").mkdir(parents=True)  # the dispatcher's fail-closed vault guard
-    wiki = vault / ".wiki"
-    _git("clone", "-q", str(origin), str(wiki), cwd=tmp_path)
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    (bin_dir / "uv").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    (bin_dir / "uv").chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
-    (origin / "wiki").write_text(f'#!/usr/bin/env bash\necho "{MARKER} $*"\n', encoding="utf-8")
-    _git("commit", "-q", "-am", "pulled engine", cwd=origin)
-    before = _git("rev-parse", "--short", "HEAD", cwd=wiki)
-
-    proc = subprocess.run(
-        [str(wiki / "wiki"), "update", "--no-skills"],
-        cwd=vault,
-        capture_output=True,
-        text=True,
-        stdin=subprocess.DEVNULL,
-        check=False,
-    )
-
-    assert proc.returncode == 0, proc.stderr
-    assert f"{MARKER} update --post-pull {before} --no-skills" in proc.stdout, (
-        "the post-pull phase ran from the code that started the update, not from the "
-        "pulled one:\n" + proc.stdout + proc.stderr
-    )
-
-
-# ── phase 2, `wiki update --post-pull <rev>` ────────────────────────────────────
 
 
 @pytest.fixture(scope="module")
@@ -119,6 +47,31 @@ def _vault(tmp_path: Path, template: Path, name: str = "vault") -> dict[str, Pat
     bin_dir = tmp_path / "bin"
     write_uv_shim(bin_dir)
     return {"vault": vault, "wiki": vault / ".wiki", "home": home, "bin": bin_dir}
+
+
+# ── phase 1 hands over to the pulled engine ─────────────────────────────────────
+
+
+def test_post_pull_steps_run_from_the_pulled_wiki(tmp_path: Path, engine_template: Path) -> None:
+    """origin moves on and its `wiki` becomes a stub that announces itself; the update
+    started by the OLD engine must hand over to that stub, with the revision from before
+    the pull, for everything after the pull."""
+    env = _vault(tmp_path, engine_template)
+    origin = track_local_origin(env["wiki"], tmp_path / "origin", ahead=False)
+    (origin / "wiki").write_text(f'#!/usr/bin/env bash\necho "{MARKER} $*"\n', encoding="utf-8")
+    git(origin, "commit", "-q", "-am", "pulled engine")
+    before = git(env["wiki"], "rev-parse", "--short", "HEAD")
+
+    proc = run_wiki(env["vault"], env["home"], env["bin"], "update", "--no-skills")
+
+    assert proc.returncode == 0, proc.stderr
+    assert f"{MARKER} update --post-pull {before} --no-skills" in proc.stdout, (
+        "the post-pull phase ran from the code that started the update, not from the "
+        "pulled one:\n" + proc.stdout + proc.stderr
+    )
+
+
+# ── phase 2, `wiki update --post-pull <rev>` ────────────────────────────────────
 
 
 def _post_pull(
@@ -195,24 +148,12 @@ def test_phase_two_refuses_an_unknown_flag(tmp_path: Path, engine_template: Path
     assert proc.stdout == ""
 
 
-def test_the_python_handler_pulls_nothing_without_post_pull(capsys) -> None:
-    """Until T03 ports phase 1, the bash pulls; `update_cli` without `--post-pull` refuses
-    instead of syncing or migrating anything. T03 replaces this test: called in-process
-    with phase 1 ported, `main([])` would pull this checkout."""
-    import update_cli
+def test_help_anywhere_in_the_flags(tmp_path: Path, engine_template: Path) -> None:
+    """The bash's flag loop took `--help` in any position; the dispatcher intercepts only
+    the first argument, so the handler answers the rest."""
+    env = _vault(tmp_path, engine_template)
 
-    assert update_cli.main([]) == 1
-    assert "--post-pull" in capsys.readouterr().err
+    proc = run_wiki(env["vault"], env["home"], env["bin"], "update", "--no-skills", "--help")
 
-
-def test_the_update_help_is_the_recorded_bash_text(capsys) -> None:
-    """The catalogue holds `update`'s help now (a `py` command carries its text), while
-    `wiki update --help` is still the bash heredoc until T03 deletes it. Held to the record
-    of that heredoc, so the switch changes nothing an operator reads."""
-    import cli
-
-    record = (REPO / "tests" / "golden" / "bash" / "update-help.txt").read_text(encoding="utf-8")
-    recorded = record.split("--- stdout ---\n", 1)[1].split("--- stderr ---\n", 1)[0]
-
-    assert cli.main(["update", "--help"]) == 0
-    assert re.sub(r"\x1b\[[0-9;]*m", "", capsys.readouterr().out) == recorded
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.startswith("wiki update — git pull --ff-only the .wiki/ checkout\n")

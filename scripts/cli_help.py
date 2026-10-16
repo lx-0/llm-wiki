@@ -885,7 +885,7 @@ SAFETY
   discard your customisations and pick up the latest engine version. Combine
   --force with a <path> to scope the overwrite to a single file."""
 
-# The bash `cmd_update` heredoc, as tests/golden/bash/update-help.txt recorded it.
+# The bash `cmd_update` heredoc (deleted in M034-S05-T03), as update-help.txt recorded it.
 H_UPDATE = """wiki update — git pull --ff-only the .wiki/ checkout
 
 USAGE

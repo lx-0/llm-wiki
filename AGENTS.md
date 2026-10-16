@@ -29,10 +29,10 @@ The **vault's own `AGENTS.md`** (separate file, not this one) is the article sch
 
 ```text
 llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-file reference is docs/engine-layout.md
-├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
-│                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
-├── lib/                     ← the bash layer, shrinking as M034 ports it: common.sh (the venv-location rule,
-│                              output helpers), ui.sh (the prompt for update)
+├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard; every command,
+│                              bare `wiki` included, goes to scripts/cli.py)
+├── lib/                     ← what is left of the bash layer: common.sh (the venv-location rule,
+│                              output helpers), until M034-S05-T05 folds it into the bootstrap
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,

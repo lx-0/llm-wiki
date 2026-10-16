@@ -1407,7 +1407,7 @@ Commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5.
 **Chose:** C. Detect via `git diff --quiet || git diff --cached --quiet`; offer stash (TTY-gated); pull; re-apply only if `git stash show -p stash@{0} | git apply --check -` passes, otherwise leave the stash unpopped with a recovery hint.
 **Reason:** B leaves a half-merged checkout (conflict markers + kept stash) on conflict, recoverable only via the banned `reset --hard`. `git apply --check` pre-flights the pop without touching the tree and errs safe (stricter than the 3-way merge, so a near-miss leaves the stash for manual `stash pop`) — never produces a conflicted tree. Operator chose auto-pop-if-clean over plain leave-in-place (A) for convenience. TTY-gate because `wiki update` is also dispatched non-interactively (dashboard health-fix). On pull failure after a stash, pop it straight back (HEAD didn't move) so a failed update never hides changes.
 **Supersedes:** —
-**Linked artifacts:** `wiki` (`cmd_update`), `README.md` Update section, KNOWLEDGE.md "`git apply --check` is the safe pre-flight for stash re-apply", commit `ecdce09`.
+**Linked artifacts:** `wiki` (`cmd_update`; since M034-S05-T03 `scripts/update_cli.py`, `_stash` / `_reapply`), `README.md` Update section, KNOWLEDGE.md "`git apply --check` is the safe pre-flight for stash re-apply", commit `ecdce09`.
 
 ## 2026-05-28: Operations log moves out of `knowledge/` into `.wiki/logs/operations.md`
 
@@ -1506,7 +1506,7 @@ C) Add `uv sync --project "$WIKI_DIR" --quiet` to `cmd_update()` right after the
 
 **Reason:** Operator mental model is "update brings everything new." A relies on the operator to remember an out-of-band step. B doesn't generalize. C closes the gap with one shell line. Catch-22 during initial bootstrap (the running `wiki update` invocation predates the patch) — operator handles it manually one shot, then future updates self-heal.
 
-**Linked artifacts:** `wiki:cmd_update`, `pyproject.toml` (explicit `pillow>=10.0.0` so the lesson has an exemplar), `.ytstack/AD-HOC-pictures-multi-path-and-metadata-SUMMARY.md`.
+**Linked artifacts:** `wiki:cmd_update` (since M034-S05-T02 `scripts/update_cli.py:post_pull`), `pyproject.toml` (explicit `pillow>=10.0.0` so the lesson has an exemplar), `.ytstack/AD-HOC-pictures-multi-path-and-metadata-SUMMARY.md`.
 
 ## 2026-05-30: All Ollama HTTP calls go through a keepalive-hardened httpx client
 

@@ -1,5 +1,6 @@
 """The line-based prompt helpers on `core/console` (M034-S02-T01) — the Python counterpart of
-`lib/ui.sh` that the config / setup / hooks / update ports use.
+the bash `lib/ui.sh` (deleted in M034-S05-T03) that the config / setup / hooks / update ports
+use.
 
 Answers are scripted through an `os.pipe()`, the way the bash oracle pipes them into `wiki`.
 They are read byte by byte, never through `sys.stdin`: on a pipe, `sys.stdin.readline()`

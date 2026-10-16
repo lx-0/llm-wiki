@@ -18,6 +18,23 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.29] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Changed
+
+- **All of `wiki update` runs in Python now, the pull included.** That covers:
+  - the check for hand edits to engine files;
+  - the offer to stash them on a terminal, and putting them back after the pull when they
+    apply cleanly;
+  - the `--ff-only` pull itself.
+
+  The messages, the prompt and the exit codes are the same as before. They are held to 14
+  recorded cases, four of them typed through a terminal.
+- `wiki update --no-skills --help` prints the help as before; the help is no longer bash.
+- The bash layer is down to the bootstrap: `wiki` is 113 lines, and `lib/ui.sh` is gone.
+
 ## [0.7.28] — 2026-10-16
 
 **For your vault:** nothing to do.

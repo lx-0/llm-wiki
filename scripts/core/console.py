@@ -163,7 +163,8 @@ def read_key(fd: int | None = None) -> str:
 
 
 # ── Line-based prompts ─────────────────────────────────────────────────────
-# The Python counterpart of lib/ui.sh (M034-S02-T01). Line-based like bash `read -r`: an
+# The Python counterpart of lib/ui.sh (M034-S02-T01; the bash file went with its last
+# caller, update's stash prompt, in M034-S05-T03). Line-based like bash `read -r`: an
 # answer piped on stdin is read, and EOF takes the default — how the bash oracle drives the
 # interactive commands and how they behave without a terminal. Input is read byte by byte
 # from the fd, never through `sys.stdin`: on a pipe `sys.stdin.readline()` buffers ahead
