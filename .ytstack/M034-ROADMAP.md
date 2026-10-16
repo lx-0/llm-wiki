@@ -59,7 +59,8 @@ and three tables.
   meta-bind and dashboard-button merges, at parity on the fixture vault and a copy of the live
   `.obsidian/`; `lib/seed.sh` retires. Done: seven releases on the way (0.7.20–0.7.26), jq
   gone from the engine, the bash layer at 427 lines.
-- [ ] S05 -- **Update + the last bash** (5 tasks). `update` with the post-pull re-exec of
+- [ ] S05 -- **Update + the last bash** (6 tasks; update's port split by phase at planning).
+  `update` with the post-pull re-exec of
   the pulled engine, proven 0.7.3 → M034 on a scratch clone. `lib/common.sh` and `lib/ui.sh`
   retire, and `wiki` lands at ≤ 150 lines. One help system: the bash help texts move into
   `cli_help` (`cmd_help` went in S01-T05).

@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T02:41:19+02:00
+last_updated: 2026-10-16T03:20:00+02:00
 current_milestone: M034
 active_slice: S05
-active_task: T01
+active_task: T02
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,12 +12,21 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S04: seed
+## Next action — M034 / S05: update + the last bash
 
-**Status:** M034 / S05 / T01 planned — ready to execute (`M034-S05-T01-PLAN.md`: the bash
-`wiki update` recorded first, from fixture vaults cloned from a local `file://` origin one
-commit ahead, plus the stash path through a pty; fix first). Slices S01–S04 are complete
-(4/6); the reassessment after S04 came out **A**, and S04's lessons are in S05's plan notes.
+**Status:** M034 / S05 / T02 planned — ready to execute (`M034-S05-T02-PLAN.md`: update's
+phase 2, `--post-pull`, in Python; the bash phase 1 re-executes into it, the cross-version
+path; the hook-environment check shares `wiki doctor`'s walker). S05 has 6 tasks now: the
+port was split by phase at planning (T02 phase 2, T03 phase 1 with `lib/ui.sh`). 1/6 done.
+Slices S01–S04 are complete (4/6).
+
+T01 closed (`M034-S05-T01-SUMMARY.md`): the bash `wiki update` is on record, in 14 goldens
+from a fixture engine tracking a local `file://` origin. The stash path is recorded through a
+pty (`run_wiki(tty=True)`).
+- **0.7.27:** in a cloud vault, the hooks warning fired with no hook installed. It is judged
+  per agent and scope now and names them.
+- `3166f30` was red on CI: the uv shim links `sys.executable`, whose name differs between
+  macOS and Linux. Fixed in `65ae757` (`<PYTHON>`).
 
 T05 closed (`M034-S04-T05-SUMMARY.md`): install.sh seeds through `wiki seed` after its venv
 sync, `lib/seed.sh` is deleted, and nothing needs jq any more (0.7.26).
