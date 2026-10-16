@@ -76,23 +76,16 @@ def check_hooks_installed() -> CheckResult:
     permission rule is not a hook, and an unreadable config runs none.
     """
     try:
-        installed_user: list[str] = []
-        installed_project: list[str] = []
-        stale_env_agents: list[str] = []
-        home = Path.home()
-        for spec in agents.AGENTS:
-            for scope, target in (("user", installed_user), ("project", installed_project)):
-                path = agents.config_path(spec.name, scope, home=home, root=ROOT_DIR)
-                try:
-                    commands = agents.wiki_commands(agents.read_config(path))
-                except (OSError, ValueError):
-                    continue
-                if commands:
-                    target.append(spec.name)
-                    # judged on the wiki's own commands: another tool's hook carrying
-                    # the variable must not hide one of ours without it
-                    if any("UV_PROJECT_ENVIRONMENT=" not in c for c in commands):
-                        stale_env_agents.append(spec.name)
+        installed = agents.installed_wiki_commands(home=Path.home(), root=ROOT_DIR)
+        installed_user = [name for name, scope in installed if scope == "user"]
+        installed_project = [name for name, scope in installed if scope == "project"]
+        # judged on the wiki's own commands: another tool's hook carrying the variable
+        # must not hide one of ours without it
+        stale_env_agents = [
+            name
+            for (name, _scope), commands in installed.items()
+            if any("UV_PROJECT_ENVIRONMENT=" not in c for c in commands)
+        ]
         if installed_user or installed_project:
             parts = []
             if installed_user:

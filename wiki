@@ -6,10 +6,11 @@
 # help texts sit in `scripts/cli_help.py`) and is the single source of truth for
 # `wiki help`. The home menu keeps its own action table (`scripts/menu.py` +
 # `scripts/core/actions.py`) — folding the two is M034's. This bash layer only does
-# bootstrap (symlink resolution + vault guard) and the one command not yet ported
-# (update). Every other subcommand — bare `wiki`, help, menu, doctor, version,
-# config, setup, install-shortcut, hooks, skills, status, seed, the dream routing
-# and the OAuth aliases included — is delegated to `scripts/cli.py` in one hop,
+# bootstrap (symlink resolution + vault guard) and the part of one command not yet
+# ported (update's pull; its second phase is scripts/update_cli.py). Every other
+# subcommand — bare `wiki`, help, menu, doctor, version, config, setup,
+# install-shortcut, hooks, skills, status, seed, the dream routing and the OAuth
+# aliases included — is delegated to `scripts/cli.py` in one hop,
 # which also owns the once-locked dashboard refresh and the OAuth bootstrap
 # (`wiki auth <service> <account-id>`).
 
@@ -58,8 +59,9 @@ require_vault() {
 }
 
 # ── Subcommand dispatchers ───────────────────────────────────────────
-# `wiki status`, `wiki hooks` (M034-S03-T05), `wiki skills` (M034-S03-T06) and `wiki seed`
-# (M034-S04-T04) are Python: status_cli.py, hooks_cli.py, skills_cli.py, seed_cli.py.
+# `wiki status`, `wiki hooks` (M034-S03-T05), `wiki skills` (M034-S03-T06), `wiki seed`
+# (M034-S04-T04) and update's second phase (M034-S05-T02) are Python: status_cli.py,
+# hooks_cli.py, skills_cli.py, seed_cli.py, update_cli.py.
 
 
 _dispatch_python() {
@@ -138,9 +140,14 @@ EOF
   if ! git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     die "Not a git checkout — $WIKI_DIR wasn't installed via install.sh. Manual update required."
   fi
+  # The second phase is Python (scripts/update_cli.py, M034-S05-T02); this bash checked its
+  # flags and the checkout, as it does for a 0.7.3 bash that re-executes into it.
   if (( post_pull == 1 )); then
-    _update_post_pull "$before" "$sync_skills"
-    return
+    if (( sync_skills == 1 )); then
+      _dispatch_python update --post-pull "$before"
+    else
+      _dispatch_python update --post-pull "$before" --no-skills
+    fi
   fi
 
   # Dirty-tree guard. `git pull --ff-only` aborts if tracked engine files have
@@ -213,97 +220,6 @@ EOF
   if (( sync_skills == 0 )); then skills_flag="--no-skills"; fi
   # shellcheck disable=SC2086  # an empty flag must expand to nothing
   exec "$WIKI_DIR/wiki" update --post-pull "$before" $skills_flag
-}
-
-# Second phase of `wiki update` (`--post-pull <rev>`): dependency sync, the two
-# idempotent migrations and the skills sync — from the pulled tree (see above).
-_update_post_pull() {
-  local before="$1" sync_skills="$2"
-  local after; after="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
-  if [[ "$before" == "$after" ]]; then
-    ok "Already up to date ($before)"
-  else
-    ok "Updated $before → $after"
-    info "If hook payloads or config schema changed, you may want to re-run:"
-    info "  wiki hooks install      ${C_DIM}# to refresh agent hook configs${C_RESET}"
-  fi
-
-  # Sync Python deps so pyproject.toml changes (new dependency, version bump)
-  # actually land in the vault's venv. Without this, an engine pull that adds
-  # a new `dependencies = [...]` entry is invisible to runtime: the venv stays
-  # on the prior resolution, imports of the new package silently fail through
-  # whatever ImportError-fallback the calling code has, and operators see
-  # features that "work in the engine repo but not in their vault".
-  # Incident 2026-05-29: pillow was added to pyproject.toml so the pictures
-  # collector's EXIF extractor could read JPEG metadata; vault venvs synced
-  # before that update returned `{}` from `_parse_exif()` because PIL wasn't
-  # installed, and the device.software field silently never landed.
-  info "Syncing Python dependencies (uv sync, idempotent) …"
-  if ! uv sync --project "$WIKI_DIR" --quiet; then
-    warn "uv sync reported errors — runtime imports may fail. To retry, run: $(sync_hint)"
-  fi
-  # Cloud-synced vault → the environment lives outside it (lib/common.sh
-  # exported UV_PROJECT_ENVIRONMENT, so the sync above already went there).
-  # Say so, and point at what is now dead weight inside the vault: a real
-  # .wiki/.venv that iCloud keeps hauling around (400 MB on lxw). Never
-  # deleted here — the operator removes it once, deliberately.
-  if [[ -n "${WIKI_VENV_DIR:-}" ]]; then
-    info "Engine environment: $WIKI_VENV_DIR (outside cloud-synced storage)"
-    if [[ -e "$WIKI_DIR/.venv" && ! -L "$WIKI_DIR/.venv" ]]; then
-      warn "stale in-vault environment at $WIKI_DIR/.venv is no longer used — remove it: rm -rf $(shell_quote "$WIKI_DIR/.venv")"
-    fi
-    # A hook runs with the agent's environment, not this one, so each wiki hook command
-    # carries the variable literally (core/agents.py's hook_cmd). Judged per agent and
-    # scope on the wiki's own hook commands (core/agents.py's HOOK_CMD_RE), as `wiki
-    # doctor` judges them: with no wiki hook installed there is nothing to re-run, and
-    # another config naming the variable hides none of ours (until 0.7.27 one grep over
-    # four configs decided). Line by line: the engine writes one command per line.
-    local stale="" agent config scope file
-    for agent in claude:.claude/settings.json codex:.codex/hooks.json \
-                 gemini:.gemini/settings.json cursor:.cursor/hooks.json; do
-      config="${agent#*:}"
-      for scope in user project; do
-        if [[ "$scope" == user ]]; then file="$HOME/$config"; else file="$ROOT_DIR/$config"; fi
-        # no `grep -q` under pipefail: an early exit would SIGPIPE the first grep
-        if grep -sE "\\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)" "$file" \
-             | grep -v 'UV_PROJECT_ENVIRONMENT=' >/dev/null; then
-          stale+="${stale:+, }${agent%%:*} ($scope)"
-        fi
-      done
-    done
-    if [[ -n "$stale" ]]; then
-      warn "hooks still run the engine from the in-vault environment: $stale — re-run: wiki hooks install"
-    fi
-  fi
-
-  # Run config-schema migration unconditionally — idempotent, prints
-  # "no change" when the vault is already on the current schema, prints
-  # the rename/add/drop diff and applies it otherwise. Keeps the vault's
-  # config.yaml in sync with whatever the engine pull just introduced.
-  info "Migrating config.yaml to current schema (idempotent) …"
-  if ! PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python \
-        -m migrations.migrate_config_keys \
-        --vault "$ROOT_DIR" --apply; then
-    warn "Config migration reported errors — inspect $ROOT_DIR/.wiki/config.yaml manually."
-  fi
-
-  # Relocate knowledge/log.md → .wiki/logs/operations.md (idempotent).
-  # Pre-2026-05-28 vaults carry a 2 MB audit log inside knowledge/ that
-  # crashes Obsidian on open. The log is engine telemetry, not knowledge.
-  info "Relocating operations log out of knowledge/ (idempotent) …"
-  if ! PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python \
-        -m migrations.migrate_log_md_path \
-        --vault "$ROOT_DIR"; then
-    warn "Operations-log migration reported errors — inspect $ROOT_DIR/knowledge/log.md manually."
-  fi
-
-  # `wiki skills` is Python (M034-S03-T06): through the entry, the pulled engine's own.
-  # The update is done by now, so a failed sync is a warning, not update's exit code.
-  if (( sync_skills == 1 )); then
-    "$WIKI_DIR/wiki" skills sync || warn "skills sync failed — rerun: wiki skills sync"
-  else
-    info "skills: skipped (--no-skills)"
-  fi
 }
 
 # ── Entry point ──────────────────────────────────────────────────────

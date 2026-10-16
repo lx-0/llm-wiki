@@ -18,6 +18,26 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.28] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Changed
+
+- **The second half of `wiki update` runs in Python.** That is everything after the pull:
+  - the dependency sync;
+  - the hints for a vault in iCloud;
+  - both migrations;
+  - the skills sync.
+
+  Its messages, writes and exit code are the same as before, held to 14 recorded cases. The
+  pull itself is still bash, until the next release. An engine from before this one hands
+  over to the new half the same way, so your next `wiki update` already runs it.
+- `wiki update` and `wiki doctor` share one check for hooks that still run the in-vault
+  environment. It reads the hook entries, not the files' lines. A permission rule that names
+  a hook no longer counts as an installed hook, and a hook written with double quotes is no
+  longer missed.
+
 ## [0.7.27] — 2026-10-16
 
 **For your vault:** nothing to do.

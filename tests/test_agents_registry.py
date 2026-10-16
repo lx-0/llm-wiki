@@ -128,16 +128,47 @@ def test_wiki_commands_lists_only_ours():
 
 def test_no_second_copy_of_the_grammar_outside_the_seam():
     """The bash carried three copies of the grammar and the doctor a fourth, each free to
-    drift (the uninstall's matched nothing current). A new copy fails here."""
+    drift (the uninstall's matched nothing current). A new copy fails here, in the bash as
+    well: 0.7.27's update warning put a fifth into `wiki`, where this test did not look."""
     copy = re.compile(r"hooks/\(session-")
     seam = ENGINE / "scripts" / "core" / "agents.py"
+    engine_files = [
+        *(path for tree in ("scripts", "hooks") for path in sorted((ENGINE / tree).rglob("*.py"))),
+        ENGINE / "wiki",
+        ENGINE / "install.sh",
+        *sorted((ENGINE / "lib").glob("*.sh")),
+    ]
     offenders = [
         str(path.relative_to(ENGINE))
-        for tree in ("scripts", "hooks")
-        for path in sorted((ENGINE / tree).rglob("*.py"))
+        for path in engine_files
         if path != seam and copy.search(path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_installed_wiki_commands_per_agent_and_scope(tmp_path):
+    """One walker behind `wiki doctor` and `wiki update` (M034-S05-T02): the wiki hook
+    commands each agent config holds, per scope, in registry × scope order. A config without
+    any, and one that cannot be read, are left out."""
+    home, root = tmp_path / "home", tmp_path / "vault"
+    bare = "uv run --project .wiki python .wiki/hooks/session-end.py"
+    configs = {
+        home / ".claude" / "settings.json": json.dumps(_claude(OURS)),
+        root / ".cursor" / "hooks.json": json.dumps(
+            {"version": 1, "hooks": {"sessionEnd": [{"command": bare}]}}
+        ),
+        home / ".codex" / "hooks.json": "{",  # half written
+        root / ".gemini" / "settings.json": json.dumps({"hooks": {}}),
+        root / ".claude" / "settings.json": json.dumps({"permissions": {"allow": [OURS]}}),
+    }
+    for path, text in configs.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    installed = agents.installed_wiki_commands(home=home, root=root)
+
+    assert installed == {("claude", "user"): [OURS], ("cursor", "project"): [bare]}
+    assert list(installed) == [("claude", "user"), ("cursor", "project")]
 
 
 def test_registry_paths(tmp_path):

@@ -56,6 +56,7 @@ from cli_help import (
     H_SUGGESTIONS,
     H_TAKE,
     H_TRIAGE,
+    H_UPDATE,
     H_USAGE,
     H_VERSION,
 )
@@ -209,7 +210,16 @@ COMMANDS: tuple[CommandSpec, ...] = (
         needs_vault=False,
         help_text=H_INSTALL_SHORTCUT,
     ),
-    CommandSpec("update", "Setup", "git pull --ff-only + sync deps/skills", kind="bash", menu=True),
+    CommandSpec(
+        "update",
+        "Setup",
+        "git pull --ff-only + sync deps/skills",
+        # the second phase (`--post-pull <rev>`); the pull is the bash's until M034-S05-T03
+        handler="update_cli.py",
+        banner=False,
+        menu=True,
+        help_text=H_UPDATE,
+    ),
     CommandSpec(
         "seed",
         "Setup",

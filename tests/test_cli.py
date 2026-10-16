@@ -244,15 +244,6 @@ def test_main_unknown_command_errors(capsys):
     assert "unknown command" in capsys.readouterr().err
 
 
-def test_main_refuses_bash_native_commands(capsys):
-    """A bash-native command (update, until its M034 port) is dispatched by the bash layer;
-    reaching cli.main with one is an error, not a silent no-op. Never name a ported command
-    here: cli.main runs its handler for real, against the directory next to the checkout
-    (seed did, M034-S04-T04)."""
-    assert cli.main(["update"]) == 1
-    assert "unknown command" in capsys.readouterr().err
-
-
 def test_main_auth_routes(monkeypatch):
     seen: dict[str, list[str]] = {}
 

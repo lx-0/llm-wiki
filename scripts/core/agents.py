@@ -173,6 +173,22 @@ def hooks_installed(cfg: Path) -> bool:
     return bool(wiki_commands(config))
 
 
+def installed_wiki_commands(*, home: Path, root: Path) -> dict[tuple[str, str], list[str]]:
+    """The wiki hook commands installed per (agent, scope), in registry × scope order, for
+    every config that holds any; one that cannot be read runs none and is left out. The one
+    walk behind `wiki doctor`'s hooks check and `wiki update`'s cloud-vault warning."""
+    installed: dict[tuple[str, str], list[str]] = {}
+    for spec in AGENTS:
+        for scope in SCOPES:
+            try:
+                config = read_config(config_path(spec.name, scope, home=home, root=root))
+            except (OSError, ValueError):
+                continue
+            if commands := wiki_commands(config):
+                installed[(spec.name, scope)] = commands
+    return installed
+
+
 def shell_quote(value: str) -> str:
     """``value`` in single quotes for a POSIX shell, each ' written as '\\'' (lib/common.sh's
     shell_quote). Always quoted, unlike shlex.quote, so a path without an apostrophe comes

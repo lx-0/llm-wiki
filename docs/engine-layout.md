@@ -179,6 +179,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── status_cli.py          ← `wiki status` — `wiki config status` over the hooks table
 │   ├── skills_cli.py          ← `wiki skills install/uninstall/sync/status` — engine-skill links in .claude/skills/, the global opt-in, the vault registry
 │   ├── seed_cli.py            ← `wiki seed [--check|--force] [<path>]`, `--extract-custom` — core/seed's walk and merges with the bash's messages, the dashboard's agent-button region, the refresh after a writing run; refuses a directory without .obsidian/
+│   ├── update_cli.py          ← `wiki update`'s second phase (`--post-pull <rev>`), run from the engine just pulled: the summary line, `uv sync`, the cloud-vault hints, both migrations as child modules, the skills sync (the pull is still `wiki`'s `cmd_update`)
 │   ├── shortcut_cli.py        ← `wiki install-shortcut` — the `~/.local/bin/wiki` symlink (refuses a non-symlink in the way), the PATH probe
 │   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI

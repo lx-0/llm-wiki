@@ -183,7 +183,7 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 | `wiki setup` | 🟢 | `scripts/setup_cli.py` + `scripts/config_cli.py:wizard` (dispatched by `scripts/cli.py`); the hooks step is `scripts/hooks_cli.py:install`, in-process | 6-question wizard + hook install |
 | `wiki status` | 🟢 | `scripts/status_cli.py` (dispatched by `scripts/cli.py`) | Config summary + hook install table + Ollama probe |
 | `wiki stats` | 🟢 | `scripts/health.py` (dispatched by `scripts/cli.py`) | Read-only vault dashboard: knowledge counts, raw-source mix, compile backlog, graph density, pipeline cadence |
-| `wiki update` | 🟢 | `wiki:cmd_update` (its skills step runs `wiki skills sync`) | `git pull --ff-only` + skill sync; preserves `config.yaml` + `.venv/` |
+| `wiki update` | 🟢 | `wiki:cmd_update` (the pull), `scripts/update_cli.py` (everything after it, from the pulled engine) | `git pull --ff-only`, then `uv sync`, the `config.yaml` migration (rewritten only when a key changes, with a backup), the operations-log migration and the skill sync; offers to stash hand edits to the engine on a terminal |
 | `wiki seed` / `wiki seed --force` | 🟢 | `scripts/seed_cli.py`, `scripts/core/seed.py` | Additive template seed + drift detection |
 | `wiki config` (editor/get/set/keys/path/wizard/status) | 🟢 | `scripts/config_cli.py` over `scripts/core/config.py` (dispatched by `scripts/cli.py`) | Bare `wiki config` is the interactive section → key → value editor; round-robin backup on every set |
 | `wiki hooks` (install/uninstall/status) | 🟢 | `scripts/hooks_cli.py` over `scripts/core/agents.py` (dispatched by `scripts/cli.py`) | Merge into agent configs that keeps other tools' hooks; a backup before every write (`scripts/core/backup.py`) |

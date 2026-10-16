@@ -884,3 +884,23 @@ SAFETY
   Default mode never overwrites your edits. Use --force only if you want to
   discard your customisations and pick up the latest engine version. Combine
   --force with a <path> to scope the overwrite to a single file."""
+
+# The bash `cmd_update` heredoc, as tests/golden/bash/update-help.txt recorded it.
+H_UPDATE = """wiki update — git pull --ff-only the .wiki/ checkout
+
+USAGE
+  wiki update                   pull + sync skill symlinks
+  wiki update --no-skills       pull only, skip skill sync
+
+NOTES
+  If the .wiki/ checkout has uncommitted changes to tracked engine files
+  (a --ff-only pull would abort on them), `wiki update` shows them and
+  offers to `git stash` them so the pull can proceed. After the pull the
+  stash is re-applied automatically — but only if it merges cleanly onto the
+  new engine. If it would conflict, it's left unpopped (recover with
+  `git -C <.wiki> stash pop`). Run from a terminal: non-interactively the
+  command refuses rather than touching your changes.
+
+  Everything after the pull (dependency sync, migrations, skills sync) runs
+  from the engine just pulled — the command re-executes itself — so a changed
+  update procedure applies in the same run, not the next one."""
