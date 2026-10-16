@@ -205,6 +205,9 @@ def _placeholders(env: dict[str, Path]) -> dict[str, str]:
         # `.wiki/.venv` there is a stale one, which keeps its path.
         str(Path(sys.executable).parent.parent): "<VENV>",
         str(env.get("venv", env["vault"] / ".wiki" / ".venv")): "<VENV>",
+        # The interpreter itself, which the uv shim links into a venv it creates: its name
+        # is the platform's (`python3` in a uv venv on macOS, `python` on the CI runner)
+        sys.executable: "<PYTHON>",
     }
 
 

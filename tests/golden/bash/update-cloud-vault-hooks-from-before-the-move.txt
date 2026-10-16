@@ -30,7 +30,7 @@ From file://<ROOT>/origin
 + <HOME>/.venvs/vault-fixture-wiki/.wiki-synced
     
 + <HOME>/.venvs/vault-fixture-wiki/bin/python
-    -> <VENV>/bin/python3
+    -> <PYTHON>
 + <HOME>/.venvs/vault-fixture-wiki/lib
     -> <VENV>/lib
 + <HOME>/.venvs/vault-fixture-wiki/pyvenv.cfg
