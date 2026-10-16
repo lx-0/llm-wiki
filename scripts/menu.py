@@ -6,10 +6,11 @@ a chain of bash-3.2 quirks (fractional read -t, empty array under
 set -u, missing ${var,,}) that each cost a commit; prompt_toolkit
 handles all of it natively.
 
-Invoked by the bash entry-point on bare `wiki` (TTY) or `wiki menu`.
-Dispatches every action by shelling out to `wiki <subcommand>` —
-never re-implements cmd_*. The bash dispatcher is the single source
-of truth for what each subcommand does.
+Opened by cli.py on bare `wiki` at a terminal, or by `wiki menu`.
+Dispatches every action by spawning `wiki <subcommand>` — never
+re-implements a command. What it offers comes from the command
+catalogue (`cli_catalog`: each command's `menu_items`), the same table
+`wiki help` renders; the pending-work rows come from `core/actions`.
 
 Cold-start: import prompt_toolkit is deferred until after the probe
 runs (~80ms saved before any rendering work begins). Subsequent
@@ -26,6 +27,8 @@ import subprocess
 import sys
 from collections.abc import Callable
 
+from cli import render_help
+from cli_catalog import COMMANDS, MENU_GROUPS, QUICK_KEYS, CommandSpec, MenuItem
 from core.console import (
     C_BOLD,
     C_CYAN,
@@ -63,7 +66,7 @@ _log = logging.getLogger("menu")
 WIKI_BIN = WIKI_DIR / "wiki"
 
 
-# ── Static dispatch catalog ─────────────────────────────────────────
+# ── Dispatch catalog, derived from cli_catalog ──────────────────────
 #
 # Each entry: (id, label, description, dispatch).
 # `dispatch` is either:
@@ -72,259 +75,53 @@ WIKI_BIN = WIKI_DIR / "wiki"
 #   ("special", name)         — invoke a builtin handler (e.g. fuzzy filter)
 #
 # The shape is reused by:
-#   - QUICK_ACTIONS  (4 entries, single-letter shortcuts)
-#   - CATEGORIES     (6 buckets × 4-11 entries, browse sub-menus)
-#   - FUZZY_CATALOG  (~49 entries, `/foo` substring filter)
-# Hand-curated; the list churns slowly.
+#   - QUICK_ACTIONS  (single-letter shortcuts, `MenuItem.quick`, in `QUICK_KEYS` order)
+#   - CATEGORIES     (one per catalogue group with menu items, keyed by `MENU_GROUPS`)
+#   - the fuzzy filter (every entry once, `/foo` substring filter)
+# One table (M034-S06-T01): the entries live on the catalogue commands they run, so an
+# entry cannot name a command `wiki` does not know, and `wiki help` and this menu share one
+# taxonomy.
 
 
-QUICK_ACTIONS: list[tuple[str, str, str, object]] = [
-    ("c", "compile", "compile up to 10 changed sources ($$)", ["compile", "--max-files", "10"]),
-    ("C", "compile-all", "force-recompile every source ($$$)", ["compile", "--all"]),
-    ("q", "query", "ask the wiki ($$)", ("special", "query")),
-    ("f", "flush", "capture current session", ["flush"]),
-    ("l", "lint", "cheap structural lint", ["lint", "--structural-only"]),
-    ("t", "triage", "review captured-intent inbox", ["triage"]),
-    ("s", "status", "config + hooks + ollama", ["status"]),
-]
+def _dispatch(command: CommandSpec, item: MenuItem) -> object:
+    if item.special:
+        return ("special", item.special)
+    argv = [command.name, *item.args]
+    return ("prompt", item.prompt, argv) if item.prompt else argv
 
 
-CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
-    "o": (
-        "collectors + OAuth",
-        [
-            ("list", "list collectors", "see what's registered", ["collect", "--list"]),
-            (
-                "run",
-                "run a collector",
-                "by name (see 'list' first)",
-                ("prompt", "Collector name", ["collect", "{arg}"]),
-            ),
-            (
-                "gmail",
-                "gmail OAuth bootstrap",
-                "one-time per account",
-                ("prompt", "Account id", ["gmail-auth", "{arg}"]),
-            ),
-            (
-                "gmeet",
-                "gmeet OAuth bootstrap",
-                "Google Meet transcripts",
-                ("prompt", "Account id", ["gmeet-auth", "{arg}"]),
-            ),
-            (
-                "calendar",
-                "calendar OAuth bootstrap",
-                "Google Calendar events",
-                ("prompt", "Account id", ["calendar-auth", "{arg}"]),
-            ),
-        ],
-    ),
-    "i": (
-        "ingest",
-        [
-            ("inbox", "process inbox/ folder", "classify + route via Ollama", ["process-inbox"]),
-            (
-                "html",
-                "ingest one URL or HTML file",
-                "html2text → raw/articles",
-                ("prompt", "URL or path", ["ingest-html", "{arg}"]),
-            ),
-            (
-                "youtube",
-                "ingest YouTube",
-                "video or playlist",
-                ("prompt", "Video or playlist URL", ["ingest-youtube", "--url", "{arg}"]),
-            ),
-            ("bridge", "bridge — list mappings", "sandbox-folder rsync mirror", ["bridge", "list"]),
-            (
-                "preprocess",
-                "preprocessors — list",
-                "in-vault intake normalizers",
-                ["preprocess", "--list"],
-            ),
-        ],
-    ),
-    "k": (
-        "knowledge ops",
-        [
-            ("compile", "compile changed sources ($$)", "incremental run", ["compile"]),
-            (
-                "compile-10",
-                "compile up to 10 sources ($$)",
-                "small batch — cap via --max-files 10",
-                ["compile", "--max-files", "10"],
-            ),
-            (
-                "compile-file",
-                "compile one file ($$)",
-                "vault-relative path",
-                ("prompt", "Path", ["compile", "--file", "{arg}"]),
-            ),
-            (
-                "lint-struct",
-                "lint (structural only)",
-                "no LLM, cheap",
-                ["lint", "--structural-only"],
-            ),
-            ("lint-full", "lint (full, costs $)", "incl. contradiction check", ["lint"]),
-            ("query", "query the wiki ($$)", "natural-language", ("special", "query")),
-            ("review", "review-wiki (local LLM, free)", "per-article quality", ["review-wiki"]),
-            (
-                "dream-all",
-                "dream — sweep all entities ($$$)",
-                "rewrite every entity page",
-                ["dream", "--all-entities"],
-            ),
-            (
-                "dream-one",
-                "dream — one entity ($$)",
-                "by slug",
-                ("prompt", "Entity slug", ["dream-entity", "{arg}"]),
-            ),
-            (
-                "pin",
-                "pin article to a MOC",
-                "by name or path",
-                ("prompt", "Article", ["pin", "{arg}"]),
-            ),
-            (
-                "health-trends",
-                "health-trend synthesis",
-                "regen concepts/health.md ($0)",
-                ["health-trends", "--dry-run"],
-            ),
-        ],
-    ),
-    "d": (
-        "facts/takes",
-        [
-            ("correct-list", "list hard facts", "knowledge/facts/*.md", ["correct", "list"]),
-            ("correct-add", "add a hard fact", "title + truth", ("special", "correct_add")),
-            (
-                "correct-edit",
-                "edit a hard fact",
-                "open in $EDITOR",
-                ("prompt", "Slug", ["correct", "edit", "{arg}"]),
-            ),
-            (
-                "correct-remove",
-                "remove a hard fact",
-                "creates .bak",
-                ("prompt", "Slug", ["correct", "remove", "{arg}"]),
-            ),
-            (
-                "correct-apply",
-                "propagate a hard fact ($$$)",
-                "agentic over vault",
-                ("prompt", "Slug", ["correct", "apply", "{arg}"]),
-            ),
-            ("take-list", "list takes", "knowledge/takes/*.md", ["take", "list"]),
-            (
-                "take-show",
-                "show takes for one holder",
-                "by slug",
-                ("prompt", "Holder slug", ["take", "show", "{arg}"]),
-            ),
-            (
-                "dedup",
-                "dedup — suggest merges",
-                "STT-noise duplicate entity pages",
-                ["dedup", "--suggest-only"],
-            ),
-        ],
-    ),
-    "a": (
-        "automation",
-        [
-            (
-                "curio-walk",
-                "curiosity — walk pending",
-                "accept/skip/reject each (interactive)",
-                ["curiosity"],
-            ),
-            (
-                "curio-list",
-                "curiosity — list requests",
-                "raw/requests/*.json",
-                ["curiosity", "--list"],
-            ),
-            (
-                "curio-oldest",
-                "curiosity — run oldest",
-                "non-interactive, local LLM (free)",
-                ["curiosity", "--run-oldest"],
-            ),
-            ("curio-all", "curiosity — run all", "all pending", ["curiosity", "--run-all"]),
-            (
-                "curio-clear",
-                "curiosity — clear done",
-                "delete done files",
-                ["curiosity", "--clear-done"],
-            ),
-            (
-                "sugg-list",
-                "suggestions — list",
-                "raw/suggestions/*.yaml",
-                ["suggestions", "--list"],
-            ),
-            (
-                "sugg-review",
-                "suggestions — review one",
-                "interactive",
-                ("prompt", "Suggestion id", ["suggestions", "--review", "{arg}"]),
-            ),
-            ("sugg-exec", "suggestions — execute approved", "imap moves / tags", ["suggestions"]),
-            ("flush", "flush session now", "manual override", ["flush"]),
-            ("agent-list", "list agent tasks", "prompts/agents/*.md", ["agent", "--list"]),
-            ("agent-run", "run an agent task", "by id", ("prompt", "Task id", ["agent", "{arg}"])),
-            ("triage", "triage — list inbox", "captured intents (task/idea/note)", ["triage"]),
-            (
-                "triage-done",
-                "triage — mark done",
-                "by record stem (unique prefix ok)",
-                ("prompt", "Record stem", ["triage", "done", "{arg}"]),
-            ),
-            (
-                "triage-dismiss",
-                "triage — dismiss",
-                "drop noise by record stem",
-                ("prompt", "Record stem", ["triage", "dismiss", "{arg}"]),
-            ),
-            (
-                "produce",
-                "producers — list",
-                "post-compile derivative extractors",
-                ["produce", "--list"],
-            ),
-            ("reconcile", "reconcile concepts", "dry-run plan, no writes", ["reconcile"]),
-            ("study", "studies — list", "operator self-reports (M019)", ["study", "list"]),
-            ("analyze", "analyze self-reports ($$$)", "two-pass analyst over studies", ["analyze"]),
-        ],
-    ),
-    "g": (
-        "setup",
-        [
-            ("status", "status", "config + hooks + ollama", ["status"]),
-            ("wizard", "run setup wizard", "6 questions + hooks", ["setup"]),
-            ("config", "edit config interactively", "section → key → value", ["config"]),
-            ("hooks-status", "hooks install table", "per agent + scope", ["hooks", "status"]),
-            ("hooks-install", "install hooks", "interactive picker", ["hooks", "install"]),
-            ("skills-status", "skills install table", "per skill + global", ["skills", "status"]),
-            ("update", "git pull + sync skills", "ff-only", ["update"]),
-            ("seed-audit", "seed — audit drift", "read-only", ["seed", "--check"]),
-            ("seed-apply", "seed — apply missing templates", "additive", ["seed"]),
-            (
-                "backfill",
-                "backfill data-shape upgrades",
-                "one-shot key adds (shows help)",
-                ["backfill"],
-            ),
-            ("usage", "token-usage ledger", "tokens per provider/model", ["usage"]),
-            ("version", "engine git revision", "rev + origin", ["version"]),
-        ],
-    ),
-}
+def _derive_categories() -> dict[str, tuple[str, list[tuple[str, str, str, object]]]]:
+    categories: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {}
+    for group, letter in MENU_GROUPS:
+        entries = [
+            (item.key, item.label, item.hint, _dispatch(command, item))
+            for command in COMMANDS
+            if command.group == group
+            for item in command.menu_items
+        ]
+        if entries:
+            categories[letter] = (group, entries)
+    return categories
+
+
+def _derive_quick_actions() -> list[tuple[str, str, str, object]]:
+    quick = {
+        item.quick[0]: (item.quick[0], item.quick[1], item.label, _dispatch(command, item))
+        for command in COMMANDS
+        for item in command.menu_items
+        if item.quick
+    }
+    return [quick[key] for key in QUICK_KEYS]
+
+
+CATEGORIES = _derive_categories()
+QUICK_ACTIONS = _derive_quick_actions()
+_CATEGORY_KEYS: frozenset[str] = frozenset(CATEGORIES)
+
+
+def _category_title(group: str) -> str:
+    """A group as the browse row names it: the help's group, in the TUI's lower case."""
+    return group.lower()
 
 
 # Single source of truth for which single-key quick actions are live. Both the
@@ -336,14 +133,13 @@ _QUICK_KEYS: frozenset[str] = frozenset(key for key, *_ in QUICK_ACTIONS)
 
 
 def _flatten_for_fuzzy() -> list[tuple[str, str, object]]:
-    """All catalog entries as (id, description, dispatch) for the fuzzy filter."""
-    out: list[tuple[str, str, object]] = []
-    for letter, (_label, entries) in CATEGORIES.items():
-        for eid, label, desc, dispatch in entries:
-            out.append((f"{letter}-{eid}", f"{label} — {desc}", dispatch))
-    for key, label, desc, dispatch in QUICK_ACTIONS:
-        out.append((f"quick-{key}", f"{label} — {desc}", dispatch))
-    return out
+    """All catalog entries as (id, description, dispatch) for the fuzzy filter — each once:
+    a shortcut is a category entry with a key, not a row of its own."""
+    return [
+        (f"{letter}-{eid}", f"{label} — {desc}", dispatch)
+        for letter, (_group, entries) in CATEGORIES.items()
+        for eid, label, desc, dispatch in entries
+    ]
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -652,10 +448,13 @@ def _build_screen_html(state: HomeState) -> str:
     lines.append("")
 
     lines.append("  <b>▸ Browse</b>")
-    lines.append(
-        "      [<b>o</b>] collectors+OAuth   [<b>i</b>] ingest    [<b>k</b>] knowledge ops"
-    )
-    lines.append("      [<b>d</b>] facts/takes        [<b>a</b>] automation [<b>g</b>] setup")
+    # Derived from CATEGORIES (the catalogue's groups), three to a row.
+    browse = [
+        f"[<b>{escape(letter)}</b>] {escape(_category_title(group))}"
+        for letter, (group, _entries) in CATEGORIES.items()
+    ]
+    for row in range(0, len(browse), 3):
+        lines.append("      " + "   ".join(browse[row : row + 3]))
     lines.append("")
     lines.append(
         "      [<b>h</b>] full help     [<b>x</b>] exit     "
@@ -776,7 +575,7 @@ def _run_home_picker(state: HomeState) -> None:
         if key in _QUICK_KEYS:
             state.selected = ("quick", key)
             continue
-        if key in ("o", "i", "k", "d", "a", "g"):
+        if key in _CATEGORY_KEYS:
             state.selected = ("category", key)
             continue
         if key == "h":
@@ -794,9 +593,9 @@ def _run_home_picker(state: HomeState) -> None:
 
 
 def _open_category(letter: str) -> None:
-    label, entries = CATEGORIES[letter]
+    group, entries = CATEGORIES[letter]
     pt = _import_pt()
-    print(f"\n  ▸ {label}\n")
+    print(f"\n  ▸ {_category_title(group)}\n")
     for i, (_eid, item_label, desc, _disp) in enumerate(entries, start=1):
         print(f"    {i:>2}) {item_label:<32} {desc}")
     print()
@@ -856,9 +655,9 @@ def main() -> int:
     # menu formatter goes on root here, at the entry point, never at import.
     setup_console_logging("menu", formatter=_MenuFormatter())
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        # Non-TTY callers — defer to `wiki help`. Same posture as the
-        # bash entry-point's TTY check.
-        subprocess.run([str(WIKI_BIN), "help"], check=False)
+        # Non-TTY callers get `wiki help`, rendered here rather than spawned through the
+        # entry again (bash → python → python; M034-S06-T01). Same posture as bare `wiki`.
+        print(render_help())
         return 0
 
     state = HomeState()
@@ -900,7 +699,7 @@ def main() -> int:
                 _pause()
             elif tag == "help":
                 print()
-                subprocess.run([str(WIKI_BIN), "help"], check=False)
+                print(render_help())
                 _pause()
             elif tag == "filter":
                 pt = _import_pt()

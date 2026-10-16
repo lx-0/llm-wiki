@@ -22,26 +22,6 @@ from core.contracts import ActionJSON
 #: `doctor --json`. Consumers refuse payloads whose schema they do not know.
 SCHEMA = 2
 
-#: Subcommands implemented in the bash dispatcher rather than `scripts/cli.py`'s table —
-#: `test_actions` checks every catalogue argv against the union of both.
-BASH_OWNED_COMMANDS = frozenset(
-    {
-        "setup",
-        "config",
-        "hooks",
-        "skills",
-        "install-shortcut",
-        "update",
-        "seed",
-        "menu",
-        "doctor",
-        "status",
-        "version",
-        "dream",
-        "dream-entity",
-    }
-)
-
 #: Fallback verbs by leading subcommand, for argv that are not a catalogue row (doctor
 #: ``dispatch_args``). An unknown command renders as the neutral "Run".
 VERB_BY_COMMAND: dict[str, str] = {

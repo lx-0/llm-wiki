@@ -4,7 +4,7 @@ slug: llm-wiki
 last_updated: 2026-10-16T04:25:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: none
+active_task: T01
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]

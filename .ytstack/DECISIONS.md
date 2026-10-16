@@ -2490,3 +2490,30 @@ buttons; KNOWLEDGE has the full chain under the same date.
 
 **Supersedes:** Meta-Bind's "engine entries first, then the operator's" (4ac7b22), now in
 place. The 2026-10-16 port decision above holds: S04-T03 ports this merge, not the old one.
+
+## 2026-10-16: The home menu and `wiki help` share one taxonomy — the catalogue's groups (M034-S06-T01, 0.7.32)
+
+**Context:** exit criterion 4 asks for one table behind `wiki help` and the home menu. Two
+taxonomies existed. The help grouped commands by `CommandSpec.group`. The TUI had its own
+six hand-written categories (`o` collectors + OAuth, `i` ingest, `k` knowledge ops,
+`d` facts/takes, `a` automation, `g` setup), whose entries named commands by string.
+
+**Chose:** the catalogue's groups are the menu's categories (`MENU_GROUPS` gives each its
+key: `v g i k d r`). Each command carries its own entries (`MenuItem`: label, hint, args,
+prompt or special handler, an optional shortcut key). The TUI derives its categories,
+shortcut row (`QUICK_KEYS` order) and fuzzy list from them. An entry's argv starts with the
+command it hangs off, so the menu cannot offer what the dispatcher would refuse.
+
+**Rejected:**
+- *A menu category per entry, keeping the TUI's six categories:* it would be the second
+  taxonomy again, carried as a field.
+- *Deriving categories but keeping the menu's letters:* `o` and `a` named categories that no
+  longer exist. The remaining letters stay where they meant the same (`g i k d`).
+
+**Consequences (decided, in the CHANGELOG):**
+- `o` and `i` merge into `i` collect & ingest, and `a` becomes `r` review & maintenance.
+- status and version go to a `v` home & status.
+- A few entries moved with their commands' groups.
+- `compile --all` is browsable as well as on `C`.
+- The fuzzy list holds each entry once.
+- The menu's flush entry is gone: it only ever printed `wiki flush`'s usage.

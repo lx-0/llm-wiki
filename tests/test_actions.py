@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from core import actions
 from core.actions import CATALOGUE, SCHEMA, ActionSpec, get, tools, verb_for
 
 
@@ -37,7 +36,7 @@ def test_ids_are_unique_and_equal_their_keys():
 def test_every_argv_starts_with_a_known_wiki_subcommand():
     import cli
 
-    known = set(cli.BY_NAME) | actions.BASH_OWNED_COMMANDS
+    known = set(cli.BY_NAME)  # every command is the catalogue's since M034-S05-T03
     for spec in CATALOGUE.values():
         assert spec.argv[0] in known, f"{spec.id}: {spec.argv[0]!r} is not a wiki subcommand"
 

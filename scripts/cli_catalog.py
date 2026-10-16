@@ -4,9 +4,9 @@ how they run, and how they show up in `wiki help` and the interactive menu.
 `COMMANDS` is the table (C06: it replaced four hand-synced catalogues — a header comment
 printed by `wiki help`, per-command heredocs, each script's argparse, and `menu.py`'s
 hand-curated list). `cli` dispatches it and renders `wiki help` from it; the per-command
-help texts live in `cli_help`; `menu.py`'s coverage is pinned against this table by a
-test. `AUTH_SERVICES` is the OAuth registry `wiki auth <service> <account-id>` dispatches
-over.
+help texts live in `cli_help`; the home menu derives its categories, entries and shortcut
+row from it (`MenuItem`, `MENU_GROUPS`, `QUICK_KEYS`; M034-S06-T01). `AUTH_SERVICES` is
+the OAuth registry `wiki auth <service> <account-id>` dispatches over.
 """
 
 from __future__ import annotations
@@ -82,6 +82,25 @@ class SubRoute:
 
 
 @dataclass(frozen=True)
+class MenuItem:
+    """One entry of the home menu (`wiki` / `wiki menu`), kept on the command it runs.
+
+    The TUI derives everything it browses from these (M034-S06-T01): a category per
+    command group (`MENU_GROUPS`), its entries in catalogue order, the fuzzy filter, and
+    the shortcut row. The entry runs `wiki <command> <args>`; `{arg}` is filled from a
+    prompt when `prompt` names one, and `special` names a builtin handler instead (query,
+    adding a fact). `quick` puts it on the home screen's shortcut row as (key, label)."""
+
+    key: str
+    label: str
+    hint: str
+    args: tuple[str, ...] = ()
+    prompt: str | None = None
+    special: str | None = None
+    quick: tuple[str, str] | None = None
+
+
+@dataclass(frozen=True)
 class CommandSpec:
     """One `wiki <name>` subcommand.
 
@@ -105,7 +124,7 @@ class CommandSpec:
     needs_vault: bool = True  # informational; the bash guard enforces it
     show_help_on_empty: bool = False  # bare `wiki <name>` prints help
     empty_help_exit: int = 0  # exit code for the bare-help case
-    menu: bool = False  # expected to be reachable from menu.py
+    menu_items: tuple[MenuItem, ...] = ()  # its home-menu entries; none: not in the menu
     help_text: str | None = None  # rich per-command help (was a bash heredoc)
     subroutes: tuple[SubRoute, ...] = ()
     takes_args: bool = True  # False: a word no subroute names is refused, not passed on
@@ -135,7 +154,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Home & status",
         "config + hooks + Ollama summary",
         handler="status_cli.py",
-        menu=True,
+        menu_items=(
+            MenuItem("status", "status", "config + hooks + ollama", quick=("s", "status")),
+        ),
         takes_args=False,
         help_text=H_STATUS,
     ),
@@ -162,7 +183,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         handler="engine_version.py",
         banner=False,
         needs_vault=False,
-        menu=True,
+        menu_items=(MenuItem("version", "engine git revision", "rev + origin"),),
         help_text=H_VERSION,
     ),
     # Setup
@@ -172,7 +193,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "first-time setup (config wizard + hooks)",
         handler="setup_cli.py",
         banner_subtitle="First-time setup: config wizard, then hook install.",
-        menu=True,
+        menu_items=(MenuItem("wizard", "run setup wizard", "6 questions + hooks"),),
         help_text=H_SETUP,
     ),
     CommandSpec(
@@ -181,7 +202,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "interactive config editor (get/set/keys/…)",
         handler="config_cli.py",
         banner=False,
-        menu=True,
+        menu_items=(MenuItem("config", "edit config interactively", "section → key → value"),),
         help_text=H_CONFIG,
     ),
     CommandSpec(
@@ -190,7 +211,10 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "install/uninstall session hooks per agent",
         handler="hooks_cli.py",
         banner=False,  # the handler prints its own, so `wiki setup` gets it in-process
-        menu=True,
+        menu_items=(
+            MenuItem("hooks-status", "hooks install table", "per agent + scope", ("status",)),
+            MenuItem("hooks-install", "install hooks", "interactive picker", ("install",)),
+        ),
         help_text=H_HOOKS,
     ),
     CommandSpec(
@@ -199,7 +223,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "wire engine skills into .claude/skills/",
         handler="skills_cli.py",
         banner=False,  # the handler prints its own (sync prints none: `wiki update` runs it)
-        menu=True,
+        menu_items=(
+            MenuItem("skills-status", "skills install table", "per skill + global", ("status",)),
+        ),
         help_text=H_SKILLS,
     ),
     CommandSpec(
@@ -216,7 +242,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "git pull --ff-only + sync deps/skills",
         handler="update_cli.py",
         banner=False,
-        menu=True,
+        menu_items=(MenuItem("update", "git pull + sync skills", "ff-only"),),
         help_text=H_UPDATE,
     ),
     CommandSpec(
@@ -225,7 +251,10 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "re-apply engine templates to the vault",
         handler="seed_cli.py",
         banner=False,  # the handler prints its own: the mode line, or --extract-custom's
-        menu=True,
+        menu_items=(
+            MenuItem("seed-audit", "seed — audit drift", "read-only", ("--check",)),
+            MenuItem("seed-apply", "seed — apply missing templates", "additive"),
+        ),
         help_text=H_SEED,
     ),
     # Collect & ingest
@@ -235,7 +264,16 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "run a Collector (--list to enumerate)",
         handler="collectors/cli.py",
         banner=False,
-        menu=True,
+        menu_items=(
+            MenuItem("list", "list collectors", "see what's registered", ("--list",)),
+            MenuItem(
+                "run",
+                "run a collector",
+                "by name (see 'list' first)",
+                ("{arg}",),
+                prompt="Collector name",
+            ),
+        ),
         help_text=H_COLLECT,
     ),
     CommandSpec(
@@ -251,7 +289,11 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "run a Producer (post-compile extractor)",
         handler="producers/cli.py",
         banner=False,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "produce", "producers — list", "post-compile derivative extractors", ("--list",)
+            ),
+        ),
         help_text=H_PRODUCE,
     ),
     CommandSpec(
@@ -260,7 +302,11 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "run a Preprocessor (--list to enumerate)",
         handler="preprocessors/cli.py",
         banner=False,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "preprocess", "preprocessors — list", "in-vault intake normalizers", ("--list",)
+            ),
+        ),
         help_text=H_PREPROCESS,
     ),
     CommandSpec(
@@ -268,7 +314,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Collect & ingest",
         "classify inbox/ files via Ollama",
         handler="process_inbox.py",
-        menu=True,
+        menu_items=(MenuItem("inbox", "process inbox/ folder", "classify + route via Ollama"),),
         help_text=H_PROCESS_INBOX,
     ),
     CommandSpec(
@@ -276,7 +322,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Collect & ingest",
         "convert an HTML file or URL into raw/",
         handler="ingest_html.py",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "html",
+                "ingest one URL or HTML file",
+                "html2text → raw/articles",
+                ("{arg}",),
+                prompt="URL or path",
+            ),
+        ),
         help_text=H_INGEST_HTML,
     ),
     CommandSpec(
@@ -284,7 +338,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Collect & ingest",
         "pull YouTube videos into raw/notes/",
         handler="ingest_youtube.py",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "youtube",
+                "ingest YouTube",
+                "video or playlist",
+                ("--url", "{arg}"),
+                prompt="Video or playlist URL",
+            ),
+        ),
         help_text=H_INGEST_YOUTUBE,
     ),
     CommandSpec(
@@ -293,7 +355,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "rsync mirror for sandbox-restricted folders",
         handler="bridge/cli.py",
         banner=False,
-        menu=True,
+        menu_items=(
+            MenuItem("bridge", "bridge — list mappings", "sandbox-folder rsync mirror", ("list",)),
+        ),
         help_text=H_BRIDGE,
     ),
     CommandSpec(
@@ -303,7 +367,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
         handler=None,
         banner=False,
         show_help_on_empty=True,
-        menu=True,
+        menu_items=(
+            MenuItem("backfill", "backfill data-shape upgrades", "one-shot key adds (shows help)"),
+        ),
         help_text=H_BACKFILL,
         subroutes=(
             SubRoute(
@@ -333,7 +399,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Collect & ingest",
         "alias: wiki auth gmail <account-id>",
         kind="alias",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "gmail",
+                "gmail OAuth bootstrap",
+                "one-time per account",
+                ("{arg}",),
+                prompt="Account id",
+            ),
+        ),
         alias_of=("auth", "gmail"),
     ),
     CommandSpec(
@@ -341,7 +415,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Collect & ingest",
         "alias: wiki auth gmeet <account-id>",
         kind="alias",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "gmeet",
+                "gmeet OAuth bootstrap",
+                "Google Meet transcripts",
+                ("{arg}",),
+                prompt="Account id",
+            ),
+        ),
         alias_of=("auth", "gmeet"),
     ),
     CommandSpec(
@@ -349,7 +431,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Collect & ingest",
         "alias: wiki auth calendar <account-id>",
         kind="alias",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "calendar",
+                "calendar OAuth bootstrap",
+                "Google Calendar events",
+                ("{arg}",),
+                prompt="Account id",
+            ),
+        ),
         alias_of=("auth", "calendar"),
     ),
     # Knowledge ops
@@ -359,14 +449,44 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "compile changed (or all) sources into knowledge/",
         handler="compile.py",
         refresh_after=True,
-        menu=True,
+        menu_items=(
+            MenuItem("compile", "compile changed sources ($$)", "incremental run"),
+            MenuItem(
+                "compile-10",
+                "compile up to 10 sources ($$)",
+                "small batch — cap via --max-files 10",
+                ("--max-files", "10"),
+                quick=("c", "compile"),
+            ),
+            MenuItem(
+                "compile-all",
+                "compile all sources ($$$)",
+                "force-recompile every source in raw/ + daily/",
+                ("--all",),
+                quick=("C", "compile-all"),
+            ),
+            MenuItem(
+                "compile-file",
+                "compile one file ($$)",
+                "vault-relative path",
+                ("--file", "{arg}"),
+                prompt="Path",
+            ),
+        ),
         help_text=H_COMPILE,
     ),
     CommandSpec(
         "dream",
         "Knowledge ops",
         "sweep all entity pages (oldest-overdue first)",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "dream-all",
+                "dream — sweep all entities ($$$)",
+                "rewrite every entity page",
+                ("--all-entities",),
+            ),
+        ),
         help_text=H_DREAM,
         # bare `wiki dream` and bare flags (`--dry-run --limit 3`) are a sweep; a word no
         # route names is refused (M034-S01-T06, the former bash case table)
@@ -403,7 +523,11 @@ COMMANDS: tuple[CommandSpec, ...] = (
         handler="dream.py",
         handler_args=("entity",),
         show_help_on_empty=True,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "dream-one", "dream — one entity ($$)", "by slug", ("{arg}",), prompt="Entity slug"
+            ),
+        ),
         help_text=H_DREAM_ENTITY,
     ),
     CommandSpec(
@@ -412,7 +536,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "ask the knowledge base in natural language",
         handler="query.py",
         show_help_on_empty=True,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "query",
+                "query the wiki ($$)",
+                "natural-language",
+                special="query",
+                quick=("q", "query"),
+            ),
+        ),
         help_text=H_QUERY,
     ),
     CommandSpec(
@@ -421,7 +553,16 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "structural + LLM contradiction health check",
         handler="lint.py",
         refresh_after=True,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "lint-struct",
+                "lint (structural only)",
+                "no LLM, cheap",
+                ("--structural-only",),
+                quick=("l", "lint"),
+            ),
+            MenuItem("lint-full", "lint (full, costs $)", "incl. contradiction check"),
+        ),
         help_text=H_LINT,
     ),
     CommandSpec(
@@ -437,7 +578,11 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "pin an article into a Map-of-Content",
         handler="pin.py",
         banner=False,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "pin", "pin article to a MOC", "by name or path", ("{arg}",), prompt="Article"
+            ),
+        ),
         help_text=H_PIN,
     ),
     CommandSpec(
@@ -459,7 +604,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Knowledge ops",
         "per-article quality scores (local LLM, free)",
         handler="review_wiki.py",
-        menu=True,
+        menu_items=(MenuItem("review", "review-wiki (local LLM, free)", "per-article quality"),),
         help_text=H_REVIEW_WIKI,
     ),
     CommandSpec(
@@ -467,7 +612,14 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Knowledge ops",
         "deterministic health-trend synthesis ($0)",
         handler="health_trends.py",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "health-trends",
+                "health-trend synthesis",
+                "regen concepts/health.md ($0)",
+                ("--dry-run",),
+            ),
+        ),
         help_text=H_HEALTH_TRENDS,
     ),
     CommandSpec(
@@ -475,7 +627,10 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Knowledge ops",
         "run an agentic task (prompts/agents/<id>.md)",
         handler="agent_task.py",
-        menu=True,
+        menu_items=(
+            MenuItem("agent-list", "list agent tasks", "prompts/agents/*.md", ("--list",)),
+            MenuItem("agent-run", "run an agent task", "by id", ("{arg}",), prompt="Task id"),
+        ),
         help_text=H_AGENT,
     ),
     # Facts & takes
@@ -487,7 +642,31 @@ COMMANDS: tuple[CommandSpec, ...] = (
         refresh_after=True,
         show_help_on_empty=True,
         empty_help_exit=1,
-        menu=True,
+        menu_items=(
+            MenuItem("correct-list", "list hard facts", "knowledge/facts/*.md", ("list",)),
+            MenuItem("correct-add", "add a hard fact", "title + truth", special="correct_add"),
+            MenuItem(
+                "correct-edit",
+                "edit a hard fact",
+                "open in $EDITOR",
+                ("edit", "{arg}"),
+                prompt="Slug",
+            ),
+            MenuItem(
+                "correct-remove",
+                "remove a hard fact",
+                "creates .bak",
+                ("remove", "{arg}"),
+                prompt="Slug",
+            ),
+            MenuItem(
+                "correct-apply",
+                "propagate a hard fact ($$$)",
+                "agentic over vault",
+                ("apply", "{arg}"),
+                prompt="Slug",
+            ),
+        ),
         help_text=H_CORRECT,
         subroutes=(
             SubRoute(
@@ -506,7 +685,16 @@ COMMANDS: tuple[CommandSpec, ...] = (
         refresh_after=True,
         show_help_on_empty=True,
         empty_help_exit=1,
-        menu=True,
+        menu_items=(
+            MenuItem("take-list", "list takes", "knowledge/takes/*.md", ("list",)),
+            MenuItem(
+                "take-show",
+                "show takes for one holder",
+                "by slug",
+                ("show", "{arg}"),
+                prompt="Holder slug",
+            ),
+        ),
         help_text=H_TAKE,
     ),
     CommandSpec(
@@ -515,7 +703,14 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "find + merge STT-noise duplicate entity pages",
         handler="dedup.py",
         refresh_after=True,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "dedup",
+                "dedup — suggest merges",
+                "STT-noise duplicate entity pages",
+                ("--suggest-only",),
+            ),
+        ),
         help_text=H_DEDUP,
     ),
     # Review & maintenance
@@ -524,7 +719,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "extract a disposable context file to daily/",
         handler="flush.py",
-        menu=True,
+        # Not in the menu: it needs the context file and session id a hook hands it, and
+        # from the menu it only ever printed its usage (exit 2) — M034-S06-T01.
         help_text=H_FLUSH,
         show_help_on_empty=True,
         empty_help_exit=2,
@@ -534,7 +730,24 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "review + run curiosity deep-scan requests",
         handler="curiosity/cli.py",
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "curio-walk",
+                "curiosity — walk pending",
+                "accept/skip/reject each (interactive)",
+            ),
+            MenuItem("curio-list", "curiosity — list requests", "raw/requests/*.json", ("--list",)),
+            MenuItem(
+                "curio-oldest",
+                "curiosity — run oldest",
+                "non-interactive, local LLM (free)",
+                ("--run-oldest",),
+            ),
+            MenuItem("curio-all", "curiosity — run all", "all pending", ("--run-all",)),
+            MenuItem(
+                "curio-clear", "curiosity — clear done", "delete done files", ("--clear-done",)
+            ),
+        ),
         help_text=H_CURIOSITY,
     ),
     CommandSpec(
@@ -542,7 +755,17 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "review + execute optimization suggestions",
         handler="suggestions/cli.py",
-        menu=True,
+        menu_items=(
+            MenuItem("sugg-list", "suggestions — list", "raw/suggestions/*.yaml", ("--list",)),
+            MenuItem(
+                "sugg-review",
+                "suggestions — review one",
+                "interactive",
+                ("--review", "{arg}"),
+                prompt="Suggestion id",
+            ),
+            MenuItem("sugg-exec", "suggestions — execute approved", "imap moves / tags"),
+        ),
         help_text=H_SUGGESTIONS,
     ),
     CommandSpec(
@@ -550,7 +773,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "autonomous concept-consistency routine",
         handler="reconcile.py",
-        menu=True,
+        menu_items=(MenuItem("reconcile", "reconcile concepts", "dry-run plan, no writes"),),
         help_text=H_RECONCILE,
     ),
     CommandSpec(
@@ -559,7 +782,28 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "review + clear the intent inbox",
         handler="triage.py",
         banner=False,
-        menu=True,
+        menu_items=(
+            MenuItem(
+                "triage",
+                "triage — list inbox",
+                "captured intents (task/idea/note)",
+                quick=("t", "triage"),
+            ),
+            MenuItem(
+                "triage-done",
+                "triage — mark done",
+                "by record stem (unique prefix ok)",
+                ("done", "{arg}"),
+                prompt="Record stem",
+            ),
+            MenuItem(
+                "triage-dismiss",
+                "triage — dismiss",
+                "drop noise by record stem",
+                ("dismiss", "{arg}"),
+                prompt="Record stem",
+            ),
+        ),
         help_text=H_TRIAGE,
     ),
     CommandSpec(
@@ -567,7 +811,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "operator-self-reports surface (M019)",
         handler="study.py",
-        menu=True,
+        menu_items=(
+            MenuItem("study", "studies — list", "operator self-reports (M019)", ("list",)),
+        ),
         help_text=H_STUDY,
     ),
     CommandSpec(
@@ -575,7 +821,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "operator-self-reports analyst layer",
         handler="analyze.py",
-        menu=True,
+        menu_items=(
+            MenuItem("analyze", "analyze self-reports ($$$)", "two-pass analyst over studies"),
+        ),
         help_text=H_ANALYZE,
     ),
     CommandSpec(
@@ -583,7 +831,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "Review & maintenance",
         "token-usage ledger (per provider/model)",
         handler="usage_report.py",
-        menu=True,
+        menu_items=(MenuItem("usage", "token-usage ledger", "tokens per provider/model"),),
         help_text=H_USAGE,
     ),
     # Help
@@ -602,6 +850,21 @@ _GROUP_ORDER = (
     "Review & maintenance",
     "Help",
 )
+
+# The home menu browses the same groups, each under one key (M034-S06-T01: one taxonomy
+# for `wiki help` and the TUI). A group without menu items has no category. The keys stay
+# clear of the shortcut row's and the home screen's own (h help, x exit, 1-9, /).
+MENU_GROUPS: tuple[tuple[str, str], ...] = (
+    ("Home & status", "v"),
+    ("Setup", "g"),
+    ("Collect & ingest", "i"),
+    ("Knowledge ops", "k"),
+    ("Facts & takes", "d"),
+    ("Review & maintenance", "r"),
+)
+
+# The shortcut row's order (the items carry their keys: `MenuItem.quick`).
+QUICK_KEYS: tuple[str, ...] = ("c", "C", "q", "l", "t", "s")
 
 
 # ── OAuth registry ──────────────────────────────────────────────────────

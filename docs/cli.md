@@ -46,12 +46,12 @@ hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
         → check Ollama is running; or `wiki config set models.ollama_url ''`
 
   ▸ Quick actions                                    ← (3) fixed shortcuts
-      [c] compile  [q] query  [f] flush  [l] lint  [s] status
+      [c] compile  [C] compile-all  [q] query  [l] lint  [t] triage  [s] status
 
   ▸ Browse                                           ← (4) category sub-menus
-      [o] collectors+OAuth   [i] ingest    [k] knowledge ops
-      [d] facts/takes        [a] automation [g] setup
-      [h] full help          [x] exit  (type /foo to filter all commands)
+      [v] home & status   [g] setup   [i] collect & ingest
+      [k] knowledge ops   [d] facts & takes   [r] review & maintenance
+      [h] full help     [x] exit     (type /foo to filter all commands)
 
   Pick: _
 ```
@@ -117,23 +117,21 @@ since the newest classified failure — the message names that failure
 remedy is one line away. Before it existed, eight days of dead flushes
 (2026-09-09→17) were invisible on every operator surface.
 
-**(3) Quick actions** — `c` compile / `q` query / `f` flush / `l` lint
-(structural-only) / `s` status. Letter or number both work; compile is
+**(3) Quick actions** — `c` compile (up to 10 sources) / `C` compile all /
+`q` query / `l` lint (structural-only) / `t` triage / `s` status. Compile is
 the daily verb, idempotent and ~50ms when nothing's changed.
 
-**(4) Browse** — six category sub-menus (collectors+OAuth / ingest /
-knowledge ops / facts & takes / automation / setup) cover the 30+
-subcommands. Letters: `o i k d a g`. Each sub-menu uses inline letter
-shortcuts (`[l] list collectors`, `[r] run a collector`, `[b] back`).
+**(4) Browse** — one sub-menu per `wiki help` group: the command catalogue
+(`scripts/cli_catalog.py`) is the single table behind both. Each command
+there carries its own menu entries (`MenuItem`), so the menu cannot offer a
+command `wiki` does not know. Letters: `v g i k d r`. A sub-menu lists its
+entries numbered; pick one by number.
 
 **Fuzzy filter** — typing `/<substring>` at the home prompt matches against
-a hand-curated catalog of 49 commands (case-insensitive). One match
-auto-dispatches; multiple opens a numbered picker. Catalog covers every
-flag variant (`compile-all`, `compile-file`, `lint-structural`, all
-OAuth flows, full `correct`/`take` lifecycles, all `curiosity` and
-`suggestions` actions, hooks + skills + seed). Cost markers (`$`,
-`$$`, `$$$`) appear in descriptions so the operator sees what a
-one-keystroke match will actually charge.
+every menu entry's id (`k-compile-all`, `i-gmail`, `d-correct-apply`, …;
+case-insensitive). One match auto-dispatches; multiple opens a numbered
+picker. Cost markers (`$`, `$$`, `$$$`) appear in descriptions so the
+operator sees what a one-keystroke match will actually charge.
 
 Probe is pure-Python, no network beyond the Ollama TCP probe, no LLM. On
 error the home screen renders the browse section only.

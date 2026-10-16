@@ -118,12 +118,12 @@ def test_render_status_line_ollama_down():
 
 
 def test_flatten_for_fuzzy_covers_all_entries():
+    """Each entry once: a quick action is a category entry with a key, not a second row."""
     import menu
 
     flat = menu._flatten_for_fuzzy()
     cat_entries = sum(len(entries) for _l, entries in menu.CATEGORIES.values())
-    expected = cat_entries + len(menu.QUICK_ACTIONS)
-    assert len(flat) == expected
+    assert len(flat) == cat_entries
     # all ids are unique
     ids = [row[0] for row in flat]
     assert len(set(ids)) == len(ids), "duplicate catalog ids in fuzzy flatten"
@@ -354,9 +354,70 @@ def test_menu_catalog_covers_every_table_menu_command():
     usage/study/analyze) and stops the catalog from silently drifting again."""
     import cli
 
-    required = {c.name for c in cli.COMMANDS if c.menu}
+    required = {c.name for c in cli.COMMANDS if c.menu_items}
     missing = required - _menu_command_tokens()
     assert not missing, f"menu-visible commands absent from menu catalog: {sorted(missing)}"
+
+
+def test_the_menu_is_derived_from_the_catalogue():
+    """One table (M034 exit criterion 4): the menu's categories are the catalogue's groups,
+    and each entry is the menu item of the catalogue command it runs, in catalogue order."""
+    import cli_catalog
+    import menu
+
+    expected = {}
+    for group, letter in cli_catalog.MENU_GROUPS:
+        entries = [
+            (item.key, item.label, item.hint)
+            for command in cli_catalog.COMMANDS
+            if command.group == group
+            for item in command.menu_items
+        ]
+        if entries:
+            expected[letter] = (group, entries)
+    derived = {
+        letter: (label, [entry[:3] for entry in entries])
+        for letter, (label, entries) in menu.CATEGORIES.items()
+    }
+    assert derived == expected
+    assert [key for key, *_ in menu.QUICK_ACTIONS] == list(cli_catalog.QUICK_KEYS)
+
+
+def test_every_menu_entry_names_a_catalogue_command():
+    """A menu entry runs `wiki <command> …` with a command the catalogue holds: the TUI cannot
+    offer what the dispatcher would refuse as unknown."""
+    import cli_catalog
+
+    assert _menu_command_tokens() <= set(cli_catalog.BY_NAME)
+
+
+def test_menu_py_keeps_no_copy_of_the_entries():
+    """The hand-curated lists are gone: no label or hint of a catalogue menu item is spelled
+    in menu.py, so the two cannot drift again."""
+    from pathlib import Path
+
+    import cli_catalog
+
+    source = (Path(cli_catalog.__file__).parent / "menu.py").read_text(encoding="utf-8")
+    copies = [
+        text
+        for command in cli_catalog.COMMANDS
+        for item in command.menu_items
+        for text in (item.label, item.hint)
+        if f'"{text}"' in source
+    ]
+    assert copies == []
+
+
+def test_the_browse_line_and_keys_come_from_the_categories():
+    from html import escape
+
+    import menu
+
+    html = menu._build_screen_html(menu.HomeState())
+    for letter, (label, _entries) in menu.CATEGORIES.items():
+        assert f"[<b>{letter}</b>] {escape(menu._category_title(label))}" in html
+    assert frozenset(menu.CATEGORIES) == menu._CATEGORY_KEYS
 
 
 def test_previously_missing_commands_now_in_menu():

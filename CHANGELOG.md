@@ -18,6 +18,31 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.32] — 2026-10-16
+
+**For your vault:** nothing to do. The home menu's letters changed, see below.
+
+### Changed
+
+- **The home menu (`wiki` at a terminal) is sorted like `wiki help`.** Its sub-menus are the
+  help's groups, and both come from one command list:
+  - `v` home & status;
+  - `g` setup;
+  - `i` collect & ingest (was `o` collectors + OAuth and `i` ingest);
+  - `k` knowledge ops;
+  - `d` facts & takes;
+  - `r` review & maintenance (was `a` automation).
+
+  A few entries moved with their commands: status and version go to `v`; backfill and the
+  producers to `i`; the agent tasks to `k`; usage to `r`. "Compile all sources" can now be
+  picked from `k` as well as with `C`, and the `/` filter lists each entry once.
+
+### Removed
+
+- **The menu's flush entry and its `f` shortcut.** `wiki flush` needs the context file and
+  session id that a hook hands it. From the menu it only ever printed its usage, since
+  2026-10-09.
+
 ## [0.7.31] — 2026-10-16
 
 **For your vault:** nothing to do.
