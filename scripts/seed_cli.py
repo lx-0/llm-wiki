@@ -15,7 +15,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from cli_help import H_SEED
+from cli_help import H_SEED, print_help
 from core import jqjson, seed
 from core.console import banner, fail, info, ok, warn
 from core.paths import ROOT_DIR, WIKI_DIR
@@ -400,7 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         elif arg == "--extract-custom":
             extract = True
         elif arg in ("-h", "--help", "help"):
-            print(H_SEED)
+            print_help(H_SEED)
             return 0
         elif arg.startswith("--"):
             fail(f"unknown flag: {arg}")

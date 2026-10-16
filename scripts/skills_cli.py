@@ -26,7 +26,7 @@ import os
 import sys
 from pathlib import Path
 
-from cli_help import H_SKILLS
+from cli_help import H_SKILLS, print_help
 from core import config as core_config
 from core.console import banner, info, ok, print_error, warn
 from core.paths import ROOT_DIR, WIKI_DIR
@@ -374,7 +374,7 @@ def main(argv: list[str] | None = None) -> int:
     if command == "status":
         return status()
     print_error(f"unknown: wiki skills {command}")
-    print(H_SKILLS)
+    print_help(H_SKILLS)
     return 1
 
 

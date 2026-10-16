@@ -9,9 +9,8 @@ heredocs, each script's argparse, and `menu.py`'s hand-curated catalog). All
 four drifted — `wiki help` was blind to 9 dispatcher-known commands. This
 module inverts the ownership: the `CommandSpec` table (`cli_catalog.COMMANDS`)
 is the catalog. `wiki help` renders from it (every command visible), the bash
-layer shrinks to bootstrap + the genuinely-bash commands and delegates
-everything else here, and `menu.py`'s coverage is pinned against the table by
-a test.
+layer is the bootstrap and delegates every command here (M034-S05-T03), and
+`menu.py`'s coverage is pinned against the table by a test.
 
 It also concentrates two policies the bash layer used to re-implement unsafely:
 
@@ -28,9 +27,8 @@ Dispatch model
 `main(argv)` looks up `argv[0]` in the table. A `py` command is run as a child
 process (`sys.executable <script> <args…>`) — same isolation the old
 `_run_script` bash helper gave, so a heavy script's asyncio loop / SDK state
-never leaks into this dispatcher. `bash` commands are never dispatched here
-(the bash layer owns them); they live in the table only so `wiki help` and the
-menu can see them. `auth` routes to the OAuth registry.
+never leaks into this dispatcher. `wiki help [<cmd>]` is answered here, every help
+text through `cli_help.print_help` (M034-S05-T04). `auth` routes to the OAuth registry.
 
 Layout (M033-S04-T07): the table, `BY_NAME` and the OAuth registry live in
 `cli_catalog`, the per-command help texts in `cli_help`; this module keeps the
@@ -47,6 +45,7 @@ import sys
 from pathlib import Path
 
 from cli_catalog import _GROUP_ORDER, AUTH_SERVICES, BY_NAME, COMMANDS, CommandSpec, SubRoute
+from cli_help import print_help
 from core.console import print_error
 from core.entry import child_env, python_m
 
@@ -126,32 +125,24 @@ def refresh_dashboards() -> None:
 # ── Help rendering ──────────────────────────────────────────────────────
 
 
-def _style_help(text: str) -> str:
-    """Bold the title line + ALL-CAPS section headers (parity with the old
-    bash heredoc styling) when stdout is a TTY; otherwise return plain text."""
-    if not _STDOUT_TTY:
-        return text
-    out: list[str] = []
-    for i, line in enumerate(text.splitlines()):
-        stripped = line.strip()
-        is_header = (
-            stripped
-            and stripped == stripped.upper()
-            and any(ch.isalpha() for ch in stripped)
-            and all(ch.isupper() or not ch.isalpha() for ch in stripped)
-        )
-        if i == 0 or is_header:
-            out.append(f"{_BOLD}{line}{_RESET}")
-        else:
-            out.append(line)
-    return "\n".join(out)
-
-
 def _print_help_text(command: CommandSpec) -> None:
     if command.help_text:
-        print(_style_help(command.help_text))
+        print_help(command.help_text)
     else:
         print(f"{_BOLD}wiki {command.name}{_RESET} — {command.summary}")
+
+
+def _help_for(name: str) -> int:
+    """`wiki help <cmd>`: what `wiki <cmd> --help` prints; an alias answers with its
+    target's. The catalogue alone used to print, and the name was dropped."""
+    command = BY_NAME.get(name)
+    if command is not None and command.kind == "alias":
+        command = BY_NAME.get(command.alias_of[0])
+    if command is None:
+        _err(f"unknown command: {name} (try 'wiki help')")
+        return 1
+    _print_help_text(command)
+    return 0
 
 
 def render_help() -> str:
@@ -266,6 +257,8 @@ def main(argv: list[str]) -> int:
         return 0
     cmd, rest = argv[0], argv[1:]
     if cmd in ("help", "-h", "--help"):
+        if rest:
+            return _help_for(rest[0])
         print(render_help())
         return 0
     if cmd == "refresh-dashboards":

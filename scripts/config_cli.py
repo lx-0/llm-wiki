@@ -21,7 +21,7 @@ from collections.abc import Callable
 
 import httpx
 
-from cli_help import H_CONFIG
+from cli_help import H_CONFIG, print_help
 from core import config as core_config
 from core.console import ask, confirm, print_error, read_line, select_one
 from core.console import banner as _banner
@@ -276,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
     if command == "wizard":
         return wizard()
     print_error(f"unknown: wiki config {command}")
-    print(H_CONFIG)
+    print_help(H_CONFIG)
     return 1
 
 

@@ -21,6 +21,7 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 ./.wiki/wiki setup            # first-time: config wizard + hooks install
 ./.wiki/wiki status           # config + hooks + Ollama probe
 ./.wiki/wiki help             # top-level usage (printed verbatim, no prompts)
+./.wiki/wiki help seed        # one command's help — the same as `wiki seed --help`
 ./.wiki/wiki config --help    # config subcommands
 ./.wiki/wiki hooks --help     # hooks subcommands
 ./.wiki/wiki update           # git pull + uv sync, preserves config.yaml
@@ -251,7 +252,8 @@ corpus walk), so they run on an operator-initiated `wiki doctor`:
 
 ## Subcommand cheat sheet
 
-Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
+Grouped by purpose. Run `wiki <cmd> --help` (or `wiki help <cmd>`) for the full per-command
+help block.
 
 ### Lifecycle
 

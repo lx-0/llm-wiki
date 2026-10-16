@@ -18,6 +18,22 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.30] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Added
+
+- **`wiki help <command>` prints that command's help,** the same as `wiki <command> --help`.
+  For an alias it prints the help of the command the alias stands for. It used to print
+  the whole list and ignore the name. An unknown name is an error now.
+
+### Changed
+
+- **Every command's help looks the same on a terminal:** a bold title and bold section
+  headings. Some commands printed theirs unstyled when the help flag came after another
+  argument (`wiki seed --check --help`). Help in a pipe is plain text, as before.
+
 ## [0.7.29] — 2026-10-16
 
 **For your vault:** nothing to do.

@@ -18,7 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-from cli_help import H_HOOKS
+from cli_help import H_HOOKS, print_help
 from core import agents
 from core.backup import backup
 from core.console import banner, confirm, fail, info, ok, print_error, select_many, select_one, warn
@@ -255,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     if command == "status":
         return status()
     print_error(f"unknown: wiki hooks {command}")
-    print(H_HOOKS)
+    print_help(H_HOOKS)
     return 1
 
 

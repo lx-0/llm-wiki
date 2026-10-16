@@ -87,8 +87,8 @@ class CommandSpec:
 
     kind:
       "py"       dispatched here — run `handler` as a child process.
-      "bash"     dispatched by the `wiki` bash layer (bootstrap / genuinely-bash
-                 commands); listed here only so help + menu stay complete.
+      "builtin"  answered by `cli.main` itself (`wiki help`); listed so help and the
+                 menu stay complete. Since M034-S05-T03 no command is the bash's.
       "auth"     the OAuth registry front-door (`wiki auth <service> <id>`).
       "alias"    another spelling: `alias_of` + the rest of argv is dispatched instead
                  (`wiki gmail-auth x` → `wiki auth gmail x`).
@@ -587,7 +587,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         help_text=H_USAGE,
     ),
     # Help
-    CommandSpec("help", "Help", "this message", kind="bash", needs_vault=False),
+    CommandSpec("help", "Help", "this message", kind="builtin", needs_vault=False),
 )
 
 BY_NAME: dict[str, CommandSpec] = {c.name: c for c in COMMANDS}

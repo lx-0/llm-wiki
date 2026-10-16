@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import subprocess
+import sys
 
 import pytest
 
@@ -242,6 +243,72 @@ def test_main_help_renders_catalog(capsys):
 def test_main_unknown_command_errors(capsys):
     assert cli.main(["frobnicate"]) == 1
     assert "unknown command" in capsys.readouterr().err
+
+
+def test_help_names_a_command(capsys):
+    """`wiki help <cmd>` is `wiki <cmd> --help` (M034-S05-T04); it used to print the whole
+    catalogue and drop the name. An alias answers with its target's help."""
+    assert cli.main(["help", "seed"]) == 0
+    assert capsys.readouterr().out.startswith("wiki seed — ")
+    assert cli.main(["help", "gmail-auth"]) == 0
+    assert capsys.readouterr().out.startswith("wiki auth ")
+
+
+def test_help_for_an_unknown_command_errors(capsys):
+    assert cli.main(["help", "frobnicate"]) == 1
+    captured = capsys.readouterr()
+    assert "unknown command: frobnicate" in captured.err
+    assert captured.out == ""
+
+
+def test_every_help_text_prints_through_one_seam():
+    """One help system (M034-S05-T04): `cli_help.print_help` styles a help text the same
+    way wherever it is printed. A handler printing its H_* itself went unstyled on a
+    terminal while `wiki <cmd> -h` was bold."""
+    offenders = [
+        f"{path.relative_to(cli.SCRIPTS_DIR)}:{n}"
+        for path in sorted(cli.SCRIPTS_DIR.rglob("*.py"))
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if "print(H_" in line
+    ]
+    assert offenders == []
+
+
+def test_a_help_text_is_styled_only_on_a_terminal(capsys, monkeypatch):
+    """Bold title and ALL-CAPS headers on a terminal, as the bash heredocs had them; plain
+    text into a pipe. A handler's own help prints the same way now (seed's did not)."""
+    import cli_help
+    import seed_cli
+
+    seed_cli.main(["--check", "--help"])
+    assert "\033[" not in capsys.readouterr().out
+
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    seed_cli.main(["--check", "--help"])
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == f"\033[1m{cli_help.H_SEED.splitlines()[0]}\033[0m"
+    assert "\033[1mUSAGE\033[0m" in lines
+    assert all("\033[" not in line for line in lines if line.startswith("  "))
+
+
+def _bash_help(text: str) -> list[str]:
+    """A help text kept in bash: a heredoc, or a `help_*` function."""
+    return [
+        line.strip()
+        for line in text.splitlines()
+        if ("<<" in line and "EOF" in line) or line.lstrip().startswith(("help_", "cmd_help"))
+    ]
+
+
+def test_no_help_text_is_left_in_the_bash():
+    """Every help text moved into cli_help with its command's port (M034 S01–S05); the
+    bash keeps none, so `wiki help` and `wiki <cmd> -h` render from one place."""
+    engine = cli.SCRIPTS_DIR.parent
+    found = {
+        path.name: _bash_help(path.read_text(encoding="utf-8"))
+        for path in [engine / "wiki", *sorted((engine / "lib").glob("*.sh"))]
+    }
+    assert {name: lines for name, lines in found.items() if lines} == {}
 
 
 def test_main_auth_routes(monkeypatch):

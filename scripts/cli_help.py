@@ -2,10 +2,39 @@
 former bash heredocs).
 
 Kept as data so `wiki <cmd> --help` stays as rich as before while the source of truth
-lives in one tested place. Section headers (ALL-CAPS lines) and the title line are bolded
-at render time (`cli._style_help`). The catalogue (`cli_catalog.COMMANDS`) points each
-command at its text; `cli` renders it.
+lives in one tested place. The catalogue (`cli_catalog.COMMANDS`) points each command at
+its text, and every help text is printed through `print_help`, by the dispatcher and by a
+handler alike (M034-S05-T04; `tests/test_cli.py` refuses a plain print of an H_ text).
 """
+
+from __future__ import annotations
+
+import sys
+
+
+def _is_header(line: str) -> bool:
+    stripped = line.strip()
+    return (
+        bool(stripped)
+        and stripped == stripped.upper()
+        and any(ch.isalpha() for ch in stripped)
+        and all(ch.isupper() or not ch.isalpha() for ch in stripped)
+    )
+
+
+def print_help(text: str) -> None:
+    """One help text: the title line and the ALL-CAPS section headers bold when stdout is a
+    terminal (the old bash heredocs' styling), plain text otherwise."""
+    if not sys.stdout.isatty():
+        print(text)
+        return
+    print(
+        "\n".join(
+            f"\033[1m{line}\033[0m" if i == 0 or _is_header(line) else line
+            for i, line in enumerate(text.splitlines())
+        )
+    )
+
 
 H_COMPILE = """wiki compile — run the compiler against changed (or all) sources
 

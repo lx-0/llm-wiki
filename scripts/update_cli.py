@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import NoReturn
 
 import skills_cli
-from cli_help import H_UPDATE
+from cli_help import H_UPDATE, print_help
 from core import agents
 from core.console import confirm, fail, info, ok, print_error, warn
 from core.paths import ROOT_DIR, WIKI_DIR
@@ -265,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
         elif arg == "--post-pull":  # internal: phase 2, with the revision from before the pull
             before = args.pop(0) if args else ""
         elif arg in ("-h", "--help", "help"):  # anywhere, as the bash's flag loop took it
-            print(H_UPDATE)
+            print_help(H_UPDATE)
             return 0
         else:
             fail(f"unknown flag: {arg}")
