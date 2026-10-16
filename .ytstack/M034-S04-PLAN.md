@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M034-S04 -- Slice Plan
@@ -51,7 +51,7 @@ Deleting the library means the installer seeds through `wiki seed` after the ven
 
   Each is at parity on the fixture and on a copy of the live vault's `.obsidian/` (arrays
   included; read-only source, copied to a tmp dir), recorded the same way.
-- [ ] T04 -- **The `seed` command** in Python:
+- [x] T04 -- **The `seed` command** in Python:
   - `--force`, `--check`, a targeted `<path>`, `--extract-custom`;
   - the help;
   - the dashboards refresh after a writing run.

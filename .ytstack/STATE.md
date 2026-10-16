@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T02:35:00+02:00
+last_updated: 2026-10-16T02:30:00+02:00
 current_milestone: M034
 active_slice: S04
-active_task: T04
+active_task: T05
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,19 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 / S04 / T04 planned — ready to execute (`M034-S04-T04-PLAN.md`: `wiki
-seed` in Python on T02's core and T03's merges; every bash seed golden passes unchanged;
-`wiki` drops `lib/seed.sh` and jq; record first: extract on a JSON list, help anywhere).
-3/5 tasks done in slice; slices S01–S03 are complete (3/6).
+**Status:** M034 / S04 / T05 planned — ready to execute (`M034-S04-T05-PLAN.md`: install.sh
+seeds through `wiki seed` after its venv sync; `lib/seed.sh`, the installer's jq and the bash
+halves of the seed tests go; an install.sh end-to-end test). 4/5 tasks done in slice; slices
+S01–S03 are complete (3/6).
+
+T04 closed (`M034-S04-T04-SUMMARY.md`): `wiki seed` runs in Python (`scripts/seed_cli.py`,
+0.7.25). All 29 seed goldens pass unchanged; `wiki` (312 lines) no longer sources
+`lib/seed.sh` nor needs jq.
+- **0.7.24:** `--extract-custom` names the right cause for a file without an overlay.
+- **Incident:** a refusal test ran the real seed into `projects/lx-0/`, 31 stray files.
+  - Fixed at the root: the test, a vault guard in `seed_cli`, and a session guard in
+    conftest.
+  - The cleanup is the operator's: `! /tmp/cleanup-stray-seed.sh`.
 
 T03 closed (`M034-S04-T03-SUMMARY.md`): the special merges run in Python
 (`union_list`, `merge_registry`, `env_missing` / `env_appended`). They are held to 22 bash
@@ -42,6 +51,8 @@ literals kept). It is held to 27 goldens recorded from the bash, and to a copy o
 - **before any `--force`**, re-capture lxw's overlays (0.7.23): `wiki seed --extract-custom
   .obsidian/graph.json`, and the same for `.obsidian/plugins/extended-graph/data.json`.
   Otherwise showTags / hideUnresolved come back on.
+- `! /tmp/cleanup-stray-seed.sh` removes the 31 vault files the T04 test incident wrote into
+  `projects/lx-0/`. It deletes only files created by that run.
 
 Open decisions: `backlog/dashboard-agent-buttons-callout.md` and
 `backlog/overlay-cannot-carry-deletions.md`. lxw's removed colour groups come back on
@@ -58,8 +69,9 @@ The planning reading found that install.sh sources lib/seed.sh before its venv e
 moves it to `wiki seed` after the `uv sync`. Open question 4 is decided (DECISIONS
 2026-10-16): the jq merges become Python `json`, held to recorded goldens.
 
-Engine 0.7.23, suite 2606 passed + 1 skipped, CI green on `e3ebb8c`. The bash is `wiki`
-(418) + `common.sh` (94) + `seed.sh` (676) + `ui.sh` (21); it owns seed and update.
+Engine 0.7.25, suite 2666 passed + 1 skipped, CI green on `d6f1401`. The bash is `wiki`
+(312) + `common.sh` (94) + `ui.sh` (21), owning update. `seed.sh` (687) is only sourced by
+install.sh until T05.
 
 **Reported, not this repo's to fix:** the ytstack post-commit hook. After T06's first commit
 a stale `.git/index.lock` was left behind (removed once `lsof` showed no holder), and its
