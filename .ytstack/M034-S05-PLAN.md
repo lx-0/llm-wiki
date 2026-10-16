@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M034-S05 -- Slice Plan
@@ -30,7 +30,7 @@ and `wiki` is the ≤ 150-line bootstrap, behind one help system.
   check shares `wiki doctor`'s walker. Proven at oracle parity, and from the real 0.7.3 tree
   on scratch. (Split from T02 at planning time: phase 1 and phase 2 together touched about
   ten files.)
-- [ ] T03 -- `update`'s phase 1 in Python: the flags, the not-a-checkout and dirty-tree
+- [x] T03 -- `update`'s phase 1 in Python: the flags, the not-a-checkout and dirty-tree
   guards, the stash on a terminal, the `--ff-only` pull, the re-apply check, and the
   re-execution of the pulled engine's entry. The bash `cmd_update` is deleted, and with it
   `lib/ui.sh`, whose last caller was the stash prompt. The in-process refusal test (T02's,

@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T03:40:00+02:00
+last_updated: 2026-10-16T03:50:00+02:00
 current_milestone: M034
 active_slice: S05
-active_task: T03
+active_task: T04
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,9 +14,16 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S05: update + the last bash
 
-**Status:** M034 / S05 / T03 planned — ready to execute (`M034-S05-T03-PLAN.md`: update's
-phase 1 in Python, so all of update is; `cmd_update` and `lib/ui.sh` deleted; held to the 14
-records, the pty stash cases included). S05: 2/6 done. Slices S01–S04 are complete (4/6).
+**Status:** M034 / S05 / T04 planned — ready to execute (`M034-S05-T04-PLAN.md`: one help
+system — `cli_help.print_help` behind the dispatcher and the five handlers, `wiki help <cmd>`,
+guards for no help in the bash and none printed past the seam). S05: 3/6 done. Slices S01–S04
+are complete (4/6).
+
+T03 closed (`M034-S05-T03-SUMMARY.md`): all of `wiki update` is Python (0.7.29). `cmd_update`
+and `lib/ui.sh` are gone, and `wiki` is 113 lines of bootstrap. The 14 records pass
+unchanged.
+- On scratch, two hops: 0.7.3's bash → the Python phase 2, and the Python phase 1 → the
+  pulled entry.
 
 T02 closed (`M034-S05-T02-SUMMARY.md`): `wiki update --post-pull` runs in Python
 (`scripts/update_cli.py`, 0.7.28). All 14 records pass unchanged.
