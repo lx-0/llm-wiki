@@ -21,12 +21,13 @@ from claude_agent_sdk import query
 
 from core.config import CONFIG
 from core.console import say, setup_console_logging
-from core.paths import QA_DIR, ROOT_DIR
+from core.paths import KNOWLEDGE_DIR, LOG_FILE, QA_DIR, ROOT_DIR
 from core.prompts import render
 from core.sdk_helpers import (
     PromptTooLargeError,
     SdkCallSpec,
     SdkRunResult,
+    WriteScope,
     assert_prompt_within_budget,
     run_sdk_query,
 )
@@ -295,6 +296,15 @@ async def main() -> None:
     # Run the query agent. The harness owns mechanics (stderr capture,
     # usage extraction, failure diagnostics) AND records this call's
     # tokens to the usage LEDGER — query.py previously never recorded.
+    #
+    # Write authority follows AGENTS.md's HARD substrate rule (M034-S06-T07; the agent reads
+    # compiled substrate, which carries change-descriptions an agent may act on). The base
+    # toolset is exactly the mode's tools, so a read mode has no Write/Edit and no mode has
+    # Bash. `--file-back` writes through a PreToolUse path scope on what its prompt asks for
+    # — the Q&A article, the index row, the operations log — with the vault's project
+    # settings. Until 0.8.1 every mode ran `acceptEdits` with the default toolset: any write
+    # anywhere in the vault went through unasked.
+    writes = args.file_back
     result = await run_sdk_query(
         prompt,
         SdkCallSpec(
@@ -304,7 +314,12 @@ async def main() -> None:
             max_turns=15,
             system_prompt={"type": "preset", "preset": "claude_code"},
             allowed_tools=tuple(allowed_tools),
-            permission_mode="acceptEdits",
+            tools=tuple(allowed_tools),
+            write_scope=(
+                WriteScope(roots=(QA_DIR, KNOWLEDGE_DIR / "index.md", LOG_FILE)) if writes else None
+            ),
+            setting_sources=("project",) if writes else None,
+            permission_mode="default",
         ),
         query_fn=query,
     )

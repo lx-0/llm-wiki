@@ -203,3 +203,45 @@ def test_prompt_stream_yields_one_user_message():
 
     msgs = _run(collect())
     assert msgs == [{"type": "user", "message": {"role": "user", "content": "hello world"}}]
+
+
+# ── no call site auto-accepts edits without a scope (AGENTS.md HARD rule) ──
+# `wiki query` ran `permission_mode="acceptEdits"` with the default toolset and no scope
+# until M034-S06-T07: every mode could write anywhere in the vault. A literal acceptEdits
+# with no `write_scope` in the same SdkCallSpec is that shape. (Agent tasks pass their spec's
+# mode through a variable — backlog `agent-task-write-scope.md`.)
+
+
+def _unscoped_accept_edits(source: str) -> list[int]:
+    import ast
+
+    lines = []
+    for node in ast.walk(ast.parse(source)):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "SdkCallSpec"):
+            continue
+        kwargs = {kw.arg: kw.value for kw in node.keywords}
+        mode = kwargs.get("permission_mode")
+        if (
+            isinstance(mode, ast.Constant)
+            and mode.value == "acceptEdits"
+            and "write_scope" not in kwargs
+        ):
+            lines.append(node.lineno)
+    return lines
+
+
+def test_the_guard_sees_the_old_query_shape():
+    old = 'SdkCallSpec(label="query", allowed_tools=("Read",), permission_mode="acceptEdits")'
+    assert _unscoped_accept_edits(old) == [1]
+    scoped = 'SdkCallSpec(permission_mode="acceptEdits", write_scope=WriteScope(roots=()))'
+    assert _unscoped_accept_edits(scoped) == []
+
+
+def test_no_sdk_call_site_auto_accepts_edits_without_a_scope():
+    scripts = Path(__file__).resolve().parent.parent / "scripts"
+    found = [
+        f"{path.relative_to(scripts)}:{line}"
+        for path in sorted(scripts.rglob("*.py"))
+        for line in _unscoped_accept_edits(path.read_text(encoding="utf-8"))
+    ]
+    assert found == []

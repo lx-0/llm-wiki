@@ -428,6 +428,10 @@ def _apply_call_spec(*, source: str, input_chars: int) -> SdkCallSpec:
         max_turns=CONFIG.limits.correct_apply_max_turns,
         system_prompt={"type": "preset", "preset": "claude_code"},
         allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+        # The base toolset is the same five (no Bash exists) and the vault's project
+        # settings load — AGENTS.md's HARD rule, layer 3 (M034-S06-T07).
+        tools=("Read", "Glob", "Grep", "Write", "Edit"),
+        setting_sources=("project",),
         write_scope=WriteScope(
             roots=(KNOWLEDGE_DIR, DAILY_DIR, INDEX_FILE, LOG_FILE),
             denied_subpaths=(FACTS_DIR,),
@@ -545,10 +549,10 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
 # ── Strict concept-reconciliation path (concept-consistency-routine) ──
 # Separate from apply(): same module + helpers, but a TIGHT scope. apply()
 # is the broad operator-driven "propagate one fact across the whole vault"
-# (acceptEdits + Bash + 50 turns). reconcile_fact() is the autonomous-routine
+# (writes across knowledge/ minus facts/, daily/, the index and the log;
+# `limits.correct_apply_max_turns`). reconcile_fact() is the autonomous-routine
 # primitive: writes locked to knowledge/concepts/ via a PreToolUse hook, no
 # Bash, bounded turns; structural file-count gate lives in reconcile.py.
-# apply() is left untouched.
 
 
 @dataclass
@@ -614,6 +618,8 @@ async def reconcile_fact(
             max_turns=CONFIG.limits.concept_reconcile_max_turns,
             system_prompt={"type": "preset", "preset": "claude_code"},
             allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+            tools=("Read", "Glob", "Grep", "Write", "Edit"),
+            setting_sources=("project",),
             write_scope=WriteScope(roots=(CONCEPTS_DIR, LOG_FILE)),
             source=f"fact:{slug}",
             input_chars=len(prompt),

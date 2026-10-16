@@ -26,6 +26,10 @@ def test_apply_call_spec_sandboxed() -> None:
     # Bash is gone — the agent cannot `rm`/`git mv`.
     assert "Bash" not in spec.allowed_tools
     assert set(spec.allowed_tools) == {"Read", "Glob", "Grep", "Write", "Edit"}
+    # …and does not exist in the base toolset either (M034-S06-T07), and the vault's
+    # project settings reach the agent — AGENTS.md's HARD rule, layer 3.
+    assert spec.tools == ("Read", "Glob", "Grep", "Write", "Edit")
+    assert spec.setting_sources == ("project",)
 
     # Not acceptEdits — the harness defaults the hook shape to "default".
     assert spec.permission_mode is None

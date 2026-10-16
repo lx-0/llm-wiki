@@ -87,7 +87,11 @@ def test_default_mode_renders_the_main_template_read_only(env, monkeypatch, caps
     assert "## domain filter" not in facts
     opts = seen["options"]
     assert list(opts.allowed_tools) == ["Read", "Glob", "Grep"]
-    assert opts.max_turns == 15 and opts.permission_mode == "acceptEdits"
+    # Read-only for real (M034-S06-T07): the base toolset IS the three read tools, so
+    # Write/Edit do not exist for this agent, and nothing auto-accepts an edit.
+    assert list(opts.tools) == ["Read", "Glob", "Grep"]
+    assert opts.max_turns == 15 and opts.permission_mode == "default"
+    assert not opts.hooks
     assert opts.cwd == str(ROOT_DIR)
     assert opts.system_prompt == {"type": "preset", "preset": "claude_code"}
     assert seen["prompt"].startswith("PROMPT[query_main]")
@@ -106,6 +110,8 @@ def test_brief_mode_renders_the_brief_template(env, monkeypatch, capsys) -> None
     assert rendered["_template"] == "query_brief"
     assert set(rendered) == {"_template", "index_md", "facts_md", "question"}
     assert list(seen["options"].allowed_tools) == ["Read", "Glob", "Grep"]
+    assert list(seen["options"].tools) == ["Read", "Glob", "Grep"]
+    assert seen["options"].permission_mode == "default"
     assert capsys.readouterr().out == "\nTHE ANSWER\n"
 
 
@@ -116,8 +122,28 @@ def test_file_back_mode_enables_writes_and_guards_the_qa_slug(env, monkeypatch, 
 
     assert rendered["_template"] == "query_file_back"
     assert rendered["today"][:4] == "2026" and rendered["now"][:4] == "2026"
-    assert list(seen["options"].allowed_tools) == ["Read", "Glob", "Grep", "Write", "Edit"]
+    opts = seen["options"]
+    assert list(opts.allowed_tools) == ["Read", "Glob", "Grep", "Write", "Edit"]
+    assert list(opts.tools) == ["Read", "Glob", "Grep", "Write", "Edit"]  # no Bash
     assert (root / "qa").is_dir()
+    # AGENTS.md's three layers (M034-S06-T07): a PreToolUse path scope instead of
+    # acceptEdits, and the vault's project settings so its CLAUDE.md reaches the agent.
+    assert opts.permission_mode == "default"
+    assert list(opts.setting_sources) == ["project"]
+    [matcher] = opts.hooks["PreToolUse"]
+    [hook] = matcher.hooks
+
+    def decision(path) -> str:
+        out = asyncio.run(
+            hook({"tool_name": "Write", "tool_input": {"file_path": str(path)}}, "t", None)
+        )
+        return out["hookSpecificOutput"]["permissionDecision"]
+
+    assert decision(root / "qa" / "new-answer.md") == "allow"
+    assert decision(query_cli.KNOWLEDGE_DIR / "index.md") == "allow"
+    assert decision(query_cli.LOG_FILE) == "allow"
+    assert decision(query_cli.KNOWLEDGE_DIR / "concepts" / "x.md") == "deny"
+    assert decision(ROOT_DIR / ".wiki" / "config.yaml") == "deny"
 
     (root / "qa" / "what-do-i-know-about-hetzner.md").write_text("# existing\n", encoding="utf-8")
     assert _exit_code(monkeypatch, "What do I know about Hetzner?", "--file-back") == 3
