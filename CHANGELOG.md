@@ -18,6 +18,31 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.34] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **The home screen and the desktop app no longer offer "Save today's AI chat to your
+  library" every day.** The check looked for `daily/sessions/<date>.md`, a path the vault
+  has not used since May (sessions are `daily/<date>/sessions.md`), so it fired every day.
+  The action ran a bare `wiki flush`, which only prints its usage: flush runs from a hook,
+  with the context file the hook hands over. A failed flush still shows up, under doctor's
+  `flush-pipeline` check.
+- `wiki dream sweep --help` named a config key for the `--selection-mode` default that
+  nothing reads. The default is `probabilistic`, as the piggyback runs.
+
+### Changed
+
+- **The home screen's header is just the vault's name.** The commit hash went with the
+  `git` call it cost on every redraw; `wiki version` prints it. "Nothing pending" lost its ✨.
+- **README.md and AGENTS.md are shorter** (378 → 295 and 326 → 248 lines). Their Contents
+  say who each section is for. Feature detail moved to the docs that already held it:
+  `docs/FEATURES.md`, `docs/cli.md`, and `docs/config.md`, which now explains how dream
+  priority combines its weights.
+- The README counts fourteen collectors under today's names, and 18 lint checks.
+
 ## [0.7.33] — 2026-10-16
 
 **For your vault:** nothing to do. If you ran a collector's extra flags by path, use the

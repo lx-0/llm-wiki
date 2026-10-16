@@ -24,7 +24,7 @@
 
 <table align="center">
   <tr>
-    <td align="center"><strong>11</strong><br/>substrate collectors</td>
+    <td align="center"><strong>14</strong><br/>substrate collectors</td>
     <td align="center"><strong>8</strong><br/>psychometric instruments</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
@@ -34,10 +34,9 @@
 
 ## Contents
 
-- [What is this](#what-is-this) · [Why it exists](#why-it-exists) · [What you get](#what-you-get)
-- [What it looks like in Obsidian](#what-it-looks-like-in-obsidian) · [Two ingest paths converge at compile](#two-ingest-paths-converge-at-compile) · [What a compiled article looks like](#what-a-compiled-article-looks-like) · [The defining choice](#the-defining-choice-compile-once-query-fast)
-- [Engine vs. vault split](#engine-vs-vault-split) · [Install](#install) · [Update](#update) · [Running scripts manually](#running-scripts-manually)
-- [Documentation map](#documentation-map) · [Security](#security) · [CLI Reference](#cli-reference) · [For contributors](#for-contributors)
+- **Deciding whether to use it:** [What is this](#what-is-this) · [Why it exists](#why-it-exists) · [What you get](#what-you-get) · [In Obsidian](#what-it-looks-like-in-obsidian) · [Two ingest paths](#two-ingest-paths-converge-at-compile) · [A compiled article](#what-a-compiled-article-looks-like) · [Compile once](#the-defining-choice-compile-once-query-fast)
+- **Installing and running it:** [Engine vs. vault](#engine-vs-vault-split) · [Install](#install) · [Update](#update) · [Commands](#commands)
+- **Reading further or contributing:** [Documentation map](#documentation-map) · [Security](#security) · [For contributors](#for-contributors)
 
 ## What is this
 
@@ -57,9 +56,7 @@ Existing tools either solve a slice or solve a different problem:
 
 - **[Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** — the `raw/` → `knowledge/` shape and the compile-don't-retrieve choice; a sketch, not a working pipeline.
 - **[claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler)** (Cole Medin) — the session-capture pattern; only handles AI-agent memories, doesn't ingest other substrates.
-- **Obsidian** — manual curation, no compilation.
-- **Notion** — team docs, not personal cartography.
-- **RAG systems** — retrieval, not compilation; weak cross-doc reasoning.
+- **Obsidian, Notion, RAG systems** — manual curation, team docs, or retrieval without compilation (weak cross-doc reasoning).
 
 llm-wiki is the **compilation layer** between raw substrates and active consumption — by humans reading and by agents prompting. It is not an archive to be left behind; it is a working surface that gets refined by being used.
 
@@ -67,23 +64,17 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 **The map** — substrates in, a compiled wiki out:
 
-- **Two-path ingest + per-day rollup** — automatic session capture (hooks → `daily/<date>/sessions.md`) and substrate-source writers (Registry-discovered Collectors + clipper + manual drop → `raw/`, plus per-day mirror summaries into `daily/<date>/{health,meetings,voice,email}.md` — email carries top senders + recent subjects, not just a count) converge at one compiler. A daily-digest pass distills the per-source captures into a single `daily/<date>.md` (~500 words). All eleven collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health, calendar, pictures, browser, tabs, screenshots, youtube.
-- **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
+- **Two-path ingest + per-day rollup** — automatic session capture (hooks → `daily/<date>/sessions.md`) and substrate-source writers (Registry-discovered Collectors + clipper + manual drop → `raw/`, plus per-day mirror summaries into `daily/<date>/{health,meetings,voice,email,pictures,captures}.md` — email carries top senders + recent subjects, not just a count) converge at one compiler. A daily-digest pass distills the per-source captures into a single `daily/<date>.md` (~500 words). All fourteen collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`), registered lazily by name: email, calendar, jamie, gmeet, wispr, voice, pictures, capture, health, screenshots, browser, tabs, youtube, folder-index.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
-- **Self-healing wiki** — `lint.py` runs 8 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
+- **Self-healing wiki** — `lint.py` runs 18 structural checks (links, orphans, staleness, article shapes and schema, fact violations, …) plus an LLM contradiction scan, so the wiki stays consistent as it grows.
 
 **Consumers of the map** — operator-gated layers that *read* the compiled wiki; where they act, only with explicit approval, downstream of the compiler:
 
 - **Surfaced commitments** — the compiler *reads back* the commitments your substrate reveals (jamie + gmeet transcripts; Task / Owner / Deadline / Context quartet) and surfaces them on the relevant `knowledge/people/<slug>.md` + `knowledge/projects/<slug>.md` entity pages as `## Action Items` (Obsidian-Tasks-plugin syntax) and `## Open Threads`. Resolved items demote to Timeline on the next compile; a dashboard pane + cross-entity Inbox MOC make them legible. This *surfaces* commitments as part of the portrait — it does **not** manage them: reminders, completion-as-workflow, and syncing to an external task tool are out of scope (a downstream consumer's job).
 - **Optimization suggestions** — the compiler proposes YAML automations (e.g. mail-filter rules) with per-action approval before execution.
 - **Remote mirror (MCP)** — `wiki publish` mirrors the vault's markdown one-way into a managed wiki on the operator's [meinkontext](https://github.com/Yesterday-AI/context-mcp) server, so every agent anywhere reads the same corpus over MCP. Idempotent by content hash, wikilinks normalized to global slugs, deletions archive upstream; one browser OAuth consent (`wiki publish --auth`), then a compile piggyback keeps it fresh. See [`docs/setup-publish.md`](docs/setup-publish.md).
-- **Operator self-reports** — air-gapped analytical surface at `<vault>/reports/`. Validated clinical screens (PHQ-9, GAD-7, WHO-5, PSS-10, ISI, OLBI) scored by an informant agent reading the operator's own substrate. Deterministic Likert + cutoffs; the LLM only fills in raw answers. Two-pass analyst (per-study + cross-study). `wiki study run <id>` + `wiki analyze`. See [`docs/cli.md`](docs/cli.md#operator-self-reports-analytical-surface).
-
-**Foundations**:
-
-- **Engine / vault split** — engine code, prompts, hooks, runtime state, and venv all live under `<vault>/.wiki/`. The vault root stays clean.
-- **One install, one CLI, one venv** — `wiki setup` + `wiki update` + `wiki status` cover the full lifecycle.
+- **Operator self-reports** — air-gapped analytical surface at `<vault>/reports/`. Validated clinical screens (PHQ-9, GAD-7, WHO-5, PSS-10, ISI, OLBI, K6, ASRS v1.1) scored by an informant agent reading the operator's own substrate. Deterministic Likert + cutoffs; the LLM only fills in raw answers. Two-pass analyst (per-study + cross-study). `wiki study run <id>` + `wiki analyze`. See [`docs/cli.md`](docs/cli.md#operator-self-reports-analytical-surface).
 
 ![Overview](docs/overview.png)
 
@@ -100,28 +91,23 @@ The sidebar is the data layout — `raw/`, `daily/`, `knowledge/` — exactly th
 ```text
 PATH A — Automatic capture                PATH B — Curated sources
 ─────────────────────────────             ──────────────────────────────────
-session-start / session-end /             Collectors (Registry — all eleven):
-pre-compact hooks attach to every         · email            (multi-backend mailboxes)
-Claude Code / Codex / Gemini /            · jamie            (Jamie AI meetings)
-Cursor session. flush.py extracts         · gmeet            (Google Meet / Gemini transcripts)
-the conversation transcript and           · calendar         (Google Calendar v3, per-date rollups)
-appends a structured entry to             · voice            (iOS Shortcuts / OpenWhispr dictation)
-daily/<date>/sessions.md, then a          · health           (Oura biometric daily rollup)
-daily-digest agent distils all            · pictures         (phone-photo inbox + gemma4 vision)
-per-source captures into                  · scan-browser     (Firefox + Chrome)
-daily/<date>.md (~500 words).             · scan-screenshots (Vision LLM)
-                                          · scan-tabs        (Firefox STG)
-                                          · scan-youtube     (yt-dlp + gemma4 visual)
-
-                                          Other writers:
-            │                             · clippings-sweep  (Obsidian Web Clipper)
-                                          · ingest-html      (file or URL)
-                                          · process-inbox    (LLM-classified drop)
+session-start / session-end /             Collectors (Registry — fourteen):
+pre-compact hooks attach to every         · mail, calendar   email, calendar
+Claude Code / Codex / Gemini /            · meetings         jamie, gmeet, wispr
+Cursor session. flush.py extracts         · mobile inboxes   voice, pictures, capture
+the conversation transcript and           · body             health (Oura)
+appends a structured entry to             · screen, web      screenshots, browser,
+daily/<date>/sessions.md, then a                             tabs, youtube
+daily-digest agent distils all            · local folders    folder-index (body-blind)
+per-source captures into
+daily/<date>.md (~500 words).             Other writers:
+                                          · clippings-sweep  (Obsidian Web Clipper)
+            │                             · ingest-html      (file or URL)
+            │                             · process-inbox    (LLM-classified drop)
             ▼                                          │
-   daily/<date>/{sessions,health,                      ▼
-      meetings,voice,email}.md +          raw/{articles,papers,notes,transcripts,
-   daily/<date>.md (compile digest)           voice,audio,requests,suggestions}/
-            │                                          │
+   daily/<date>/<source>.md +                          ▼
+   daily/<date>.md (compile digest)       raw/{articles,papers,notes,transcripts,voice,
+            │                                  audio,captures,index,requests,suggestions}/
             └──────────────┐    ┌──────────────────────┘
                            ▼    ▼
                   ┌────────────────────┐
@@ -136,8 +122,7 @@ daily/<date>.md (~500 words).             · scan-screenshots (Vision LLM)
                   │     knowledge/     │   LLM owns; you and your agents read.
                   │  concepts/         │
                   │  connections/      │   ← cross-source links
-                  │  projects/         │
-                  │  people/           │
+                  │  people/ projects/ │
                   │  qa/               │
                   │  facts/            │   ← human-owned hard facts (override sources)
                   │  MOCs/             │   ← curated topic hubs (Maps of Content)
@@ -148,21 +133,17 @@ daily/<date>.md (~500 words).             · scan-screenshots (Vision LLM)
 After every compile, two side loops run on the new article:
 
 - **Curiosity loop** — a small local Ollama model spots gaps and writes JSON deep-scan requests to `raw/requests/`. The next compile cycle picks one up and fills the gap.
-- **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `suggestions/cli.py` applies them only after explicit per-action approval.
-
-`lint.py` watches the wiki itself: 8 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, article type, sparse articles, fact violations) plus one LLM-driven contradiction scan.
+- **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `wiki suggestions` applies them only after explicit per-action approval.
 
 When raw sources contradict reality — a Slack thread that calls a project by its old name, an old memo that claims a never-won award — `wiki correct` lets you write a **hard fact** to `knowledge/facts/<slug>.md`. Hard facts inject into compile + query prompts at the highest authority, so future compilations honour them automatically. `wiki correct apply <slug>` then spawns an agent that walks the existing wiki, strikes contaminated claims, fixes wikilinks, and — for disambiguation facts — renames files. Raw sources stay immutable; only `knowledge/` (and minimal correction notes in `daily/`) are touched.
 
-`wiki reconcile` is the autonomous, signal-driven version of that loop: it reads the lint fact-violations (concepts that contradict a hard fact) and reconciles them under a strict envelope — writes scope-locked to `knowledge/concepts/`, structural gates (skip a fact touching more than N concepts → manual review, cap facts per run), a per-fact cooldown, and tiered autonomy (only unambiguous fact-violations are auto-fixed; concept↔concept contradictions stay propose-only in the lint surface). It is dry-run by default and double-gated OFF (`features.concept_reconciliation` + a `piggybacks.concept_reconcile` block) so it only runs autonomously once you opt in.
+More passes over the compiled wiki, each in [docs/cli.md](docs/cli.md#synthesis--maintenance):
 
-`wiki health-trends` is the deterministic synthesis consumer for the health corpus. A single day's biometrics aren't knowledge, but trends across years are — so this pass ($0, no LLM) aggregates every numeric metric in `raw/notes/health/**` into a coverage-aware `## Trends` block (range, all-time vs recent average, trend arrow) inside `knowledge/concepts/health.md`. Default OFF; safe to enable.
-
-`wiki dedup` cleans up the silent duplicates that speech-to-text leaves behind. Transcribers garble names consistently — `josefine-bartsch` vs `josephine-bartc`, a real company vs a phantom the model invented — splitting one entity across two pages. Detection is $0 and deterministic (fuzzy + a German-aware phonetic key + shared sources); every merge is operator-confirmed, folds the duplicate's timeline/action-items/aliases into the survivor, rewrites all wikilinks, backs up + deletes the duplicate, and records a canonical-name hard fact so it can't silently come back.
-
-`wiki dream web-research` enriches **public** people (founders, execs, speakers) the way you'd reflexively google a new contact — a targeted Exa search at dream time writes a clearly-labelled `## Public Profile` block, kept structurally separate from compiled content and never fed back into `raw/`. Opt-in per vault *and* per entity; default OFF (it makes an external paid API call).
-
-`wiki usage` shows where the model budget actually goes. Every LLM call — Claude (subscription) and Ollama (local) — is metered in **tokens per provider/model**, not dollars (a single USD figure would conflate non-commensurable billing). Usage lands in `state/usage.json`; `wiki usage --days N` prints it per day with totals.
+- `wiki reconcile` — fixes concepts that contradict a hard fact, write-scoped to `knowledge/concepts/`; dry-run by default and off until you opt in.
+- `wiki health-trends` — a deterministic `## Trends` block over the health corpus ($0, no LLM); off by default.
+- `wiki dedup` — finds the duplicate entity pages speech-to-text leaves behind; every merge is operator-confirmed.
+- `wiki dream web-research` — a labelled `## Public Profile` for public people via Exa; opt-in per vault and per entity.
+- `wiki usage` — where the model budget goes, in tokens per provider/model, never dollars.
 
 ## What a compiled article looks like
 
@@ -185,23 +166,13 @@ updated: 2026-05-02
 Agent-facing configuration files (CLAUDE.md, AGENTS.md) are *executed* by
 agents, not just *read*. When they contain stale facts about the repo
 (default branch, layout, conventions), agents act on those stale facts and
-produce broken artifacts. PR #121 in `Yesterday-AI/agentic-foundation` was
-a concrete instance: a stale "default branch = `feat/initial-structure`"
-line in `CLAUDE.md` caused an agent to base a PR on the wrong branch …
+produce broken artifacts …
 
 ## Key Points
 
 - **CLAUDE.md is not documentation — it's instructions.** Agents follow it
-  like a runbook. Outdated facts produce outdated actions.
-- **Counter-pattern to [[concepts/documentation-redundancy-for-agents]]:**
-  redundancy protects against agents *missing* a rule; freshness protects
-  against agents *following* an outdated rule. Both matter.
-
-## Related
-
-- [[concepts/agentic-foundation-skill-system]] — same repo, flat skills layout
-- [[concepts/research-before-suggesting]] — verify state, don't trust assumed state
-- [[concepts/a2a-one-click-provisioning]] — second instance of the same bug class
+  like a runbook. Outdated facts produce outdated actions. Freshness is the
+  counter-pattern to [[concepts/documentation-redundancy-for-agents]].
 
 ## Sources
 
@@ -213,7 +184,7 @@ Three things to notice:
 
 - **Frontmatter** is structured (aliases, tags, sources, dates) so Dataview queries hit it cleanly.
 - **`[[wikilinks]]`** point both *into* the wiki (`concepts/...`) and *back to durable sources* (`daily/...`, `raw/notes/...`, `raw/articles/...`, `raw/transcripts/...`) — the audit trail is part of the article, not a metadata field.
-- **The article is atomic.** It argues one idea, cites two different days' sessions, and links to four sibling concepts. The compiler chose this granularity from the raw substrates; nothing is hand-curated.
+- **The article is atomic.** It argues one idea, cites two different days' sessions, and links to sibling concepts. The compiler chose this granularity from the raw substrates; nothing is hand-curated.
 
 ## The defining choice: compile once, query fast
 
@@ -226,7 +197,7 @@ Knowledge is distilled into Markdown wikilinks at compile time — no embedding 
 
 **Speed compounds.** Every query is a Markdown read, so the wiki ends up read more often than it's written — by you, and by every agent you give vault access to. That inversion (output → input ratio greater than 1) is the point.
 
-Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) (the `raw/` + `knowledge/` shape, the compile-don't-retrieve choice) and [Cole Medin's claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler) (the session-capture pattern). The architecture wrapped around them — collectors, two-path ingest, curiosity loop, suggestions, lint, hooks across multiple agents, the engine/vault split — is the work of this project. Full design rationale in [docs/concept.md](docs/concept.md); hard-won engine learnings (Ollama gotchas, rate-limit debugging, anti-patterns) in [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md).
+The architecture wrapped around Karpathy's shape and Cole Medin's session capture — collectors, two-path ingest, curiosity loop, suggestions, lint, hooks across multiple agents, the engine/vault split — is the work of this project. Full design rationale in [docs/concept.md](docs/concept.md); hard-won engine learnings (Ollama gotchas, rate-limit debugging, anti-patterns) in [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md).
 
 ## Engine vs. vault split
 
@@ -235,7 +206,7 @@ Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6b
 ├── AGENTS.md              ← article-schema spec (seeded from templates/, then yours)
 ├── dashboard.md           ← Dataview home page (seeded from templates/, then yours)
 ├── raw/                   ← immutable curated sources (LLM reads, never writes)
-├── daily/                 ← per-day rollup: <date>/{sessions,health,meetings,voice,email}.md per-source captures + <date>.md compile-stage digest
+├── daily/                 ← per-day rollup: <date>/<source>.md per-source captures + <date>.md compile-stage digest
 ├── knowledge/             ← LLM-compiled wiki (LLM owns, you and agents read)
 ├── reports/               ← operator self-reports (air-gapped from compile): studies/<id>/runs/<ts>/instruments/*.md + _summary.md + _analysis.md, plus analyses/ for Pass-2
 ├── inbox/                 ← transient — `wiki process-inbox` classifies + moves to raw/
@@ -255,35 +226,30 @@ curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bas
 curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bash -s -- ~/path/to/vault
 ```
 
-The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, and runs `wiki seed`. That first `wiki` call creates the venv at `<target>/.wiki/.venv/` (or at `~/.venvs/<vault>-wiki` when the vault sits in iCloud Drive / CloudStorage — cloud sync evicts files and kills running binaries; the engine addresses that environment via `UV_PROJECT_ENVIRONMENT`). The seed fills the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work — and `wiki skills sync` links the engine's skills.
+The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, and runs `wiki seed`. That first `wiki` call creates the Python environment at `<target>/.wiki/.venv/` (or at `~/.venvs/<vault>-wiki` when the vault sits in iCloud Drive / CloudStorage — cloud sync evicts files and kills running binaries; the engine addresses that environment via `UV_PROJECT_ENVIRONMENT`). The seed fills the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work — and `wiki skills sync` links the engine's skills.
 
 | Created path | Source | Purpose |
 |---|---|---|
 | `<vault>/AGENTS.md` | `templates/AGENTS.example.md` | Article-schema spec read by every compile prompt. Edit the *Vault Owner* + *Language* sections. |
 | `<vault>/dashboard.md` | `templates/dashboard.md` | Obsidian Dataview home (recently-compiled / wiki stats / recent daily logs). |
-| `<vault>/.obsidian/community-plugins.json` | `templates/.obsidian/` | Lists `dataview` + `obsidian-excalidraw-plugin` for first-launch approval. |
-| `<vault>/.obsidian/core-plugins.json` | `templates/.obsidian/` | Sensible defaults (daily-notes, properties, graph on; sync/publish off). |
+| `<vault>/.obsidian/{community,core}-plugins.json` | `templates/.obsidian/` | `dataview` + `obsidian-excalidraw-plugin` for first-launch approval; core defaults (daily-notes, properties, graph on; sync/publish off). |
 | `<vault>/.claude/skills/use-llm-wiki` | symlink to `.wiki/skills/use-llm-wiki` | The one bundled engine-side skill — lets agents query, contribute, or diagnose this wiki via the `wiki` CLI from any project. *Global-eligible*: `wiki skills install --global` links it into `~/.claude/skills/` so agents anywhere can reach it. The other operator skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `vault-health-check`, `vault-triage`) ship via the Claude Code plugin marketplace `yesterday-public-plugins`, not as repo-bundled skills. |
 
-**Prerequisites:** `bash` ≥ 4, `git`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
+**Prerequisites:** `bash`, `git`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
 
 After install:
 
 ```bash
 cd ~/path/to/vault
-./.wiki/wiki setup        # 6-question wizard: Ollama URL, compile model,
-                          #   compile-after hour, procmail execution, local-LLM
-                          #   bundle, global skill install
+./.wiki/wiki setup        # 6-question wizard (Ollama URL, compile model, compile-after hour, …)
 ./.wiki/wiki status       # config + hook install table + Ollama probe
-./.wiki/wiki              # interactive home screen — context-sensitive
-                          #   "what's pending" + browse categories
+./.wiki/wiki              # interactive home screen — what's pending + browse by group
 ```
 
 ## Update
 
 ```bash
 ./.wiki/wiki update                # git pull --ff-only + sync skill symlinks into .claude/skills/
-./.wiki/wiki update --no-skills    # pull only (skip skill sync)
 ./.wiki/wiki skills status         # per-skill linked / collision / missing table + global state
 ./.wiki/wiki skills install        # ad-hoc resync without pulling
 ./.wiki/wiki skills install --global  # also link use-llm-wiki into ~/.claude/skills/ + register vault
@@ -297,20 +263,9 @@ If the `.wiki/` checkout has uncommitted changes to **tracked** engine files (di
 
 `wiki seed` re-applies engine templates to the vault root after an update — adds missing files (`dashboard.md`, `_dashboard-stats.md`, `.obsidian/plugins/<name>/data.json`) and **merges** `community-plugins.json` (additive — never drops your own plugins). Default mode never overwrites your existing files; use `--force` to replace customisations of `dashboard.md` / `AGENTS.md` with the engine version.
 
-## Running scripts manually
+## Commands
 
-The venv lives inside `.wiki/`. Two equivalent invocations:
-
-```bash
-# Option A — cd into .wiki first (matches script docstrings)
-cd ~/path/to/vault/.wiki
-uv run python scripts/compile.py
-
-# Option B — pin --project from any CWD
-uv run --project ~/path/to/vault/.wiki python ~/path/to/vault/.wiki/scripts/compile.py
-```
-
-Hooks always use Option B (the `--project` flag is hardcoded into the agent config).
+Bare `./.wiki/wiki` opens the **home screen**: a status line (`384 articles · last compile 4h ago · ollama ✓`), what is pending in your vault (`3 files in inbox/ → process-inbox`), a health banner when something is broken (missing hooks, unreachable Ollama, recent compile errors) with the fix, the shortcut keys, and the command groups to browse — the same groups `wiki help` prints, from one command table. `/` filters every command. Without a terminal (CI, hooks, pipes) it prints the help and exits. Agents read the same state as JSON: `wiki menu --json` (what's pending) and `wiki doctor --json` (config, connectivity and pipeline audit; `--quick` for hook use). Run engine code through `wiki`, not a bare `uv run`: on a cloud-synced vault that rebuilds the environment inside the vault. Full reference — every subcommand, every config key, every hook target — in [docs/cli.md](docs/cli.md).
 
 ## Documentation map
 
@@ -318,8 +273,9 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 |---|---|
 | [docs/PRINCIPLES.md](docs/PRINCIPLES.md) | The ten core rules — constitution of the wiki, with verbatim Karpathy / OpenClaw / own quotes + attribution |
 | [docs/concept.md](docs/concept.md) | Three-layer architecture, compile-vs-RAG, cognitive-function mapping, curiosity loop |
-| [docs/PROCESS.md](docs/PROCESS.md) *(German)* | Live documentation of every data flow inside the engine — 13 numbered processes (German prose, English diagrams) |
-| [docs/cli.md](docs/cli.md) | Full CLI reference — every `wiki <subcommand>`, every config key, every hook target |
+| [docs/PROCESS.md](docs/PROCESS.md) *(German)* | Live documentation of every data flow inside the engine — numbered processes (German prose, English diagrams; a PR that touches a flow keeps the prose language) |
+| [docs/cli.md](docs/cli.md) | Full CLI reference — every `wiki <subcommand>`, the home screen, every hook target |
+| [docs/config.md](docs/config.md) | Every config key, generated from the schema |
 | [docs/FEATURES.md](docs/FEATURES.md) | Implementation map of every engine feature — status, code location, trigger, known gaps. Maintained alongside code. |
 | [docs/engine-layout.md](docs/engine-layout.md) | File-by-file tree of `.wiki/` — the engine internals |
 | [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |
@@ -330,49 +286,10 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 | [.ytstack/DECISIONS.md](.ytstack/DECISIONS.md) | Locked architectural choices |
 | [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md) | Hard-won engine learnings (Ollama, rate limits, anti-patterns) |
 
-> **Documentation language.** Most docs are English. **`docs/PROCESS.md` is in German** — pull requests that touch a flow keep the existing prose language; bilingual is fine, and Mermaid labels / table headers in English keep diagrams accessible.
+## Security
 
-## Security and code gates
-
-Secrets-leak prevention and the code gates run on two layers:
-
-- **CI** — [secrets-scan.yml](.github/workflows/secrets-scan.yml): gitleaks scans every push + PR + nightly cron, blocks merge on leaks. [ci.yml](.github/workflows/ci.yml): on every push + PR to `main`, the engine job runs `ruff check`, `ruff format --check`, the `ty` type check on `scripts/core/` (and reports the count for the rest of `scripts/`) and the pytest suite (Linux), the desktop job runs `npm test` (tsc + svelte-check + vitest) and Biome.
-- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks, lint drift and type errors before they reach git (gitleaks, file hygiene, `ruff-check --fix`, `ruff-format`, `ty check scripts/core`):
-
-  ```bash
-  pip install pre-commit && pre-commit install
-  ```
-
-The ruff rule set — and the reason for every ignore — lives in [pyproject.toml](pyproject.toml); run the gates by hand with `uv sync --group lint --group typecheck` once, then `uv run --group lint ruff check scripts hooks tests` and `uv run --group typecheck ty check scripts/core`. The pytest suite carries the structural gates too: no function of 150 lines or more, no module over 1,000 lines without a reason in [docs/engine-layout.md](docs/engine-layout.md#large-modules), and the `--json` payloads validated against [docs/contracts/](docs/contracts/). Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Manual scan: `gitleaks detect --no-banner -v`.
-
-If you find a leak in history, rotate the secret immediately, then file an issue (don't post the leaked value).
-
----
-
-## CLI Reference
-
-Bare `./.wiki/wiki` opens an **interactive home screen** (rendered by
-`scripts/menu.py` via `prompt_toolkit` — arrow keys, redraw, raw mode) with: a
-status one-liner (`384 articles · last compile 4h ago · ollama ✓`),
-context-sensitive suggestions (`3 files in inbox/ → process-inbox`, `12
-sources changed → compile`), 4 quick-action letter shortcuts, a 6-bucket
-category browse, and a `/<substring>` fuzzy filter across 49 commands. Plus a
-**health banner** at the top when something's broken (missing hooks,
-unreachable Ollama, recent compile errors) with inline fix hints. The menu
-shells back to `wiki <subcommand>` for every dispatch — bash stays the single
-source of truth for what each subcommand does. Non-TTY callers (CI, hooks,
-pipes) get the help dump and exit. Two agent-facing JSON surfaces:
-`wiki menu --json` (what's pending) and `wiki doctor --json` (config +
-connectivity + pipeline audit, with `--quick` for sub-50ms hook usage). Full
-reference — every subcommand, every config key, every hook target — lives in
-[docs/cli.md](docs/cli.md).
+Secrets never enter git: gitleaks runs in CI on every push and PR and nightly ([secrets-scan.yml](.github/workflows/secrets-scan.yml)) and blocks the merge on a leak, and the [pre-commit](.pre-commit-config.yaml) hooks run it before a commit (`pip install pre-commit && pre-commit install`). Rules and allowlist: [.gitleaks.toml](.gitleaks.toml); a manual scan is `gitleaks detect --no-banner -v`. If you find a leak in history, rotate the secret immediately, then file an issue (don't post the leaked value). The code gates — ruff, ty, the size gates, the pytest suite — are listed in [AGENTS.md](AGENTS.md#style).
 
 ## For contributors
 
-Engine internals (file-by-file tree, the bash/python split rationale) live in [docs/engine-layout.md](docs/engine-layout.md). Development conventions — how to add an agent target, a tunable, or a prompt; style + side-effect rules — live in [AGENTS.md](AGENTS.md).
-
-<!-- ## Star history
-
-<a href="https://star-history.com/#lx-0/llm-wiki&Date">
-  <img alt="Star history" src="https://api.star-history.com/svg?repos=lx-0/llm-wiki&type=Date" width="640">
-</a> -->
+Engine internals (file-by-file tree, how a module runs) live in [docs/engine-layout.md](docs/engine-layout.md). Development conventions — how to add an agent target, a tunable, or a prompt; style, gates and side-effect rules — live in [AGENTS.md](AGENTS.md).

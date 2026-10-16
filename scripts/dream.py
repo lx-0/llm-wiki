@@ -1090,7 +1090,7 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["probabilistic", "greedy"],
         default=None,
         help="M017: probabilistic (weighted-random) | greedy (top-N by weight). "
-        "Default reads from piggybacks.dream_cycle.selection_mode config.",
+        "Default: probabilistic, as the piggyback runs.",
     )
 
     p_pb = sub.add_parser("piggyback", help="Piggyback wrapper — runs sweep with config defaults")

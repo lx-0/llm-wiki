@@ -3531,3 +3531,12 @@ The cause was the installer's order. It seeded the vault templates before its ve
 - **What the operator sees:** `wiki update` and `wiki doctor` report it as a stale in-vault environment and print the `rm -rf` line. It is never auto-deleted (DECISIONS 2026-09-17).
 - **Why it cannot recur:** since 0.7.31 (M034-S05-T05) the installer builds no environment. Its first `wiki` call applies the rule. `tests/test_install.py::test_an_install_into_a_cloud_vault_keeps_the_environment_outside_it` pins that.
 - **Lesson:** a rule that decides where state goes must hold before the first command that creates state. A rule exported halfway through a script governs only what comes after it.
+
+## A reader-side probe kept the old path, and its tests built the old path for it (2026-10-16, M034-S06-T05, 0.7.34)
+
+The home screen's "Save today's AI chat" suggestion checked `daily/sessions/<today>.md`. The daily layout became `daily/<date>/sessions.md` on 2026-05-15, so the probe returned 1 every day for five months, in the TUI and in the desktop's `menu --json`. The live lxw vault had 140 days of `daily/<date>/sessions.md` and no `daily/sessions/` at all.
+
+- **Why nothing caught it:** the probe's unit tests and the oracle's fixture vault created `daily/sessions/` themselves, because that is what the probe read. The tests verified the reader against its own assumption, never against the writer. The oracle's comment even called the always-1 count a determinism rule.
+- **Second defect, same row:** the action ran a bare `wiki flush`, which since 2026-10-09 prints its usage and exits 2 without a hook's context file. M034-S06-T01 removed the menu entry for that reason but not the suggestion that ran the same argv.
+- **Fix:** both are gone. `test_actions.py::test_no_action_runs_a_command_that_only_prints_its_usage` refuses any action whose argv is a bare command that the catalogue answers with help and a failing exit. It failed on `flush` before the removal.
+- **Lesson:** a probe of a written file takes its path from the writer (`core.daily_capture`), not from its own string. Its fixture is built by calling the writer, so a moved layout breaks the test instead of being mirrored in it. When a command loses an entry point for being unrunnable, grep every other surface that dispatches the same argv.

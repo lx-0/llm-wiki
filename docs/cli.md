@@ -225,9 +225,9 @@ catalogue (`scripts/core/actions.py`) when `dispatch_args` is set, else
 `dispatch_args` is non-null the menu promotes the issue into the navigable
 Actionable list and Enter dispatches `wiki <dispatch_args>`.
 
-Agents pick a suggestion from `wiki menu --json` then dispatch its `argv` via the
-regular bash subcommand (e.g. `wiki compile`). They never ask the menu
-to dispatch — bash stays single source of truth.
+Agents pick a suggestion from `wiki menu --json` then dispatch its `argv` as a
+regular `wiki` command (e.g. `wiki compile`). They never ask the menu to dispatch —
+the command table (`scripts/cli_catalog.py`) stays the single source of truth.
 
 Both payloads are typed once, in `scripts/core/contracts.py`. The JSON Schemas
 `docs/contracts/menu.schema.json` and `docs/contracts/doctor.schema.json` are generated

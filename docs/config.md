@@ -10,6 +10,7 @@ The per-section key tables below are **generated from the schema** (`PYTHONPATH=
 - [Section index](#section-index)
 - Generated key tables: [scheduling](#scheduling) · [models](#models) · [features](#features) · [limits](#limits) · [piggybacks](#piggybacks) · [graph_view](#graph_view) · [skills](#skills) · [personal](#personal)
 - [Non-default piggyback keys](#non-default-piggyback-keys)
+- [Dream priority — how the weights combine](#dream-priority--how-the-weights-combine)
 - [Accounts (M002+ nested schema)](#accounts-m002-nested-schema)
 - [Secrets — `.claude/.env`](#secrets--claudeenv)
 - [Editing safely](#editing-safely)
@@ -290,6 +291,16 @@ Three piggyback names have **no defaults entry** — their block's *absence* is 
 - `piggybacks.scan_youtube` — the YouTube collector reads `max_per_run` from this block as its inbox-drain cap when present (it's a `piggyback_default=False` collector: operator-paced, never auto-spawned).
 - `piggybacks.concept_reconcile` — the autonomous concept-reconciliation routine only auto-runs with this block present AND `features.concept_reconciliation: true` (double gate).
 - `piggybacks.health_trends` — health-trend synthesis only auto-runs with this block present AND `features.health_trends: true` (double gate).
+
+## Dream priority — how the weights combine
+
+`scheduling.dream_priority` biases which entity pages the dream sweep re-synthesizes. Without rules every overdue entity weighs the same. One entity's weight resolves in this order (`dream_priority.py:compute_entity_priority`):
+
+1. its frontmatter `dream_priority: <float>` — an absolute override, `0` included;
+2. the first `paths:` glob that matches it (fnmatch); `0` takes it out of the sweep, and `wiki dream <slug>` still runs it by hand;
+3. else `default × domain × tag × status` — `domain:` frontmatter, page tags (combined by `tag_strategy`: `max | sum | first`) and `status:` each look up a multiplier.
+
+A sweep picks with `--selection-mode probabilistic` (weighted-random; the default, and the piggyback's) or `greedy` (top-N by weight). `wiki dream list-candidates --limit 15` prints rank, weight, the rule that fired, age and source per entity.
 
 ## Accounts (M002+ nested schema)
 

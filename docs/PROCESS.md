@@ -887,14 +887,15 @@ Der Inhalt der Frontmatter:
 
 Parallel zu `_dashboard-stats.md` schreibt `scripts/dashboard/dashboard_lint.py` die Datei `_dashboard-lint.md` ans Vault-Root — gleicher Trigger-Pfad (`flush.py:refresh_dashboard_lint()` direkt nach `refresh_dashboard_stats`, plus nach `wiki compile` / `wiki lint` / `wiki correct` / `wiki take` — `refresh_after` im Katalog — und nach `wiki seed`, alle über `cli.refresh_dashboards`).
 
-`dashboard.md`-Section "🛡 Lint triage" rendert vier collapsible Obsidian-Callouts. Counts kommen aus dem `_dashboard-lint.md`-Frontmatter via DataviewJS; Body ist Section-Embed:
+`dashboard.md`-Section "🛡 Lint triage" rendert drei collapsible Obsidian-Callouts. Counts kommen aus dem `_dashboard-lint.md`-Frontmatter via DataviewJS; Body ist Section-Embed:
 
 | Queue | Quelle | Inhalt |
 |-------|--------|--------|
 | Orphans | `lint.check_orphan_pages()` | Artikel in `knowledge/`, auf die kein anderer Artikel verlinkt |
 | Stale | `lint.check_stale_articles()` | Artikel deren Source seit letztem Compile geändert wurde |
-| Missing backlinks | `lint.check_missing_backlinks()` | Artikel die auf andere verlinken ohne Rück-Link |
 | Failed flushes | `.wiki/sessions/failed-flushes/*.md` | Markdown-Stubs aus crashed Flush-Pipelines |
+
+(Die vierte Queue, fehlende Backlinks, ist seit 2026-07-22 weg: der Backlinks-Pass legt die Gegenkante bei jedem Compile an — DECISIONS 2026-07-22.)
 
 Empty Queue → `[!success] Title (0)` (auto-collapsed, grün). Non-empty → `[!warning]- Title (N)` (collapsed-by-default, gelb) mit Wikilink-Liste im Body. Klick auf einen Wikilink springt zum Issue-File.
 
@@ -1193,7 +1194,7 @@ Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
 
 ### Auto-Wiring durch `wiki seed`
 
-`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agents/*.md` mit `button:` Frontmatter und liefert pro Button einen Shell-commands-Eintrag (`agent-<id>`, Alias `Wiki: agent <id>`) und ein Meta-Bind-Button-Template (`btn-<id>`). Ein Dashboard-Button braucht beide: Meta-Bind löst `` `BUTTON[id]` `` seit 1.4 nur noch gegen die `buttonTemplates` seiner `data.json` auf (Definitionen in eingebetteten Notizen zählen nicht mehr), und der Button führt den Shell-commands-Befehl über dessen Palette-Namen aus, den Alias. `lib/seed.sh` verdrahtet auf zwei Pfaden:
+`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agents/*.md` mit `button:` Frontmatter und liefert pro Button einen Shell-commands-Eintrag (`agent-<id>`, Alias `Wiki: agent <id>`) und ein Meta-Bind-Button-Template (`btn-<id>`). Ein Dashboard-Button braucht beide: Meta-Bind löst `` `BUTTON[id]` `` seit 1.4 nur noch gegen die `buttonTemplates` seiner `data.json` auf (Definitionen in eingebetteten Notizen zählen nicht mehr), und der Button führt den Shell-commands-Befehl über dessen Palette-Namen aus, den Alias. `wiki seed` (`seed_cli.py` mit `core/seed.py`) verdrahtet auf zwei Pfaden:
 
 1. **Merge in die zwei Plugin-Register:** `core/seed.py:merge_registry` merged die Engine-Einträge per id in `shell_commands` (`.obsidian/plugins/obsidian-shellcommands/data.json`) und `buttonTemplates` (`.obsidian/plugins/obsidian-meta-bind-plugin/data.json`). Engine-Einträge = die des Templates plus die generierten; die Templates tragen keine Agent-Einträge (`tests/test_agent_buttons.py` hält sie dazu an — eine Template-Kopie driftete: `btn-dream-cycle` stand im Dashboard und in keinem Register).
    - Ein Eintrag mit Engine-id übernimmt die Felder der Engine **an Ort und Stelle**. Felder, die die Engine nicht ausliefert, bleiben: die des Plugins (`debounce`, `execution_notification_mode`) und die des Operators.
