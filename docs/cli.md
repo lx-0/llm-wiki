@@ -325,6 +325,7 @@ help block.
 | `wiki reconcile [--apply] [--limit N]` | autonomous concept↔fact reconciliation — reads `lint` fact-violations and fixes flagged `knowledge/concepts/` under a strict envelope. Dry-run by default; structural gates (skip a fact touching > `limits.concept_reconcile_max_files_per_fact` concepts → manual review; ≤ `_max_facts_per_run` per sweep). Double-gated OFF (`features.concept_reconciliation` + a `piggybacks.concept_reconcile` block). |
 | `wiki health-trends [--dry-run]` | deterministic ($0, no LLM) health-metric aggregation → sentinel `## Trends` block in `knowledge/concepts/health.md`. Double-gated OFF (`features.health_trends` + a `piggybacks.health_trends` block). |
 | `wiki usage [--days N] [--json]` | read back the token-usage ledger (`state/usage.json`) — tokens per `(provider, model)`, bucketed by date with totals. LLM usage is metered in tokens, never dollars (Claude is a subscription, Ollama is local). |
+| `wiki refresh-dashboards [--dry-run]` | rebuild `_dashboard-stats.md` + `_dashboard-lint.md`, the fragments `dashboard.md` transcludes — the Dashboard's refresh button runs it. Locked: while another refresh holds `state/dashboard-refresh.lock`, it skips. They also refresh after every flush, after `compile` / `lint` / `correct` / `take`, and after `seed`. `--dry-run` prints both as JSON + rendered body and writes nothing. |
 
 ### Hard facts (`correct`)
 
@@ -341,6 +342,7 @@ help block.
 |---|---|
 | `wiki collect --list` | list registered Collectors with their `SPEC` |
 | `wiki collect <name> [flags]` | run one Collector. Flags: `--dry-run` (log without writing), `--incremental` (delta-only when supported), `--account ID` (restrict to one account, where applicable). |
+| `wiki collect <name> -- <flags>` | the collector's own CLI: everything after `--` goes to its module's `main(argv)`. `screenshots` (`--all`, `--limit N`, `--backfill DAYS`, `--backfill-thumbnails`, `--retrofit-batch-reports`, `--dry-run`), `browser` (`--source firefox\|chrome\|all`, `--dry-run`), `tabs` (`--backup-dir DIR`, `--dry-run`); `wiki collect <name> -- --help` lists them. youtube's and folder-index's own CLIs are `wiki ingest-youtube` and `wiki index`. |
 | `wiki collect email` | sweep configured mailboxes — output to `raw/notes/email/<account>-<date>.md`. Reads accounts from `personal.accounts.*`; secrets from `.claude/.env`. |
 | `wiki collect jamie` | pull meetings from the Jamie AI API into `raw/transcripts/jamie/<date>--<slug>--<id>.md`. Multi-tenant: per-account `jamie:` sub-block under `personal.accounts.<id>` with `kind: jamie-api`; api key read from the env var named in `api_key_env`. Auto-runs as piggyback every 6 h. |
 | `wiki collect gmeet` | export Google Meet / Gemini transcript+notes Docs from the Drive "Meet Recordings" folder into `raw/transcripts/gmeet/<date>--<slug>--<meeting-key>.md`. Multi-tenant: per-account `gmeet:` sub-block under `personal.accounts.<id>` with `kind: gmeet-api`; one-time OAuth via `wiki gmeet-auth <id>`. Auto-runs as piggyback every 6 h. |

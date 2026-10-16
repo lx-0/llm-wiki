@@ -49,19 +49,17 @@ def test_run_child_spawns_module_with_scripts_on_pythonpath(monkeypatch, tmp_pat
         "ingest_html",
         "ingest_youtube",
         "index_folders",
-        "scan_screenshots",
-        "scan_browser",
-        "scan_tabs",
     ],
 )
 def test_entry_modules_run_once_without_runpy_warning(entry: str) -> None:
-    """`preprocessors/__init__.py` and `collectors/__init__.py` import their modules to
-    register them, so `python -m preprocessors.inbox` / `-m collectors.scan_youtube` would
-    execute the module twice and runpy warns ("found in sys.modules after import of
-    package"). The top-level entry modules exist to avoid exactly that — this is the guard.
-    `wiki index` and `wiki ingest-youtube` printed that warning on every real run after
-    T03 moved the spawns to `-m`; `--help` never showed it because cli.py answers `--help`
-    itself (M033-S02-T05)."""
+    """`preprocessors/__init__.py` imports its modules to register them, so
+    `python -m preprocessors.inbox` would execute the module twice and runpy warns ("found in
+    sys.modules after import of package"). The top-level entry modules exist to avoid that —
+    this is the guard. `wiki index` and `wiki ingest-youtube` printed that warning on every
+    real run after T03 moved the spawns to `-m`; `--help` never showed it because cli.py
+    answers `--help` itself (M033-S02-T05). The `collectors` package imports no collector
+    since M034-S06-T03; its two entries stay the commands' entry points, and the three
+    by-path collector scripts went with `wiki collect <name> -- <flags>` (S06-T04)."""
     import subprocess
 
     env = dict(os.environ, PYTHONPATH=str(cli.SCRIPTS_DIR))

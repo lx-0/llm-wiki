@@ -8,8 +8,8 @@ Wired in two ways:
   - As a Registry-discovered Collector: `wiki collect tabs`. The `@register`
     decorator below adds `TabsCollector` to `collectors.Registry`; `flush.py`
     auto-spawns it as `collectors/cli.py tabs` when piggyback fires.
-  - As a direct CLI: `uv run --project .wiki python .wiki/scripts/scan_tabs.py`
-    (the top-level entry script) keeps the `--dry-run` / `--backup-dir` flags.
+  - As its own CLI, `main(argv)`: `wiki collect tabs -- --backup-dir DIR`
+    keeps the `--dry-run` / `--backup-dir` flags.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 
 from collectors.base import CollectorSpec, RunResult, register
 from core.config import CONFIG
+from core.console import say
 from core.errors import swallow
 from core.paths import RAW_DIR, ROOT_DIR
 from core.utils import today_iso
@@ -208,40 +209,38 @@ class TabsCollector:
         )
 
 
-# ── Direct CLI entry (backward-compat) ──────────────────────────────
+# ── Own CLI: `wiki collect tabs -- <flags>` ─────────────────────────
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Scan Firefox Simple Tab Groups")
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="wiki collect tabs --", description="Scan Firefox Simple Tab Groups"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Only show group stats")
     parser.add_argument("--backup-dir", type=str, help="Path to STG backup directory")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     backup_dir = Path(args.backup_dir) if args.backup_dir else DEFAULT_BACKUP_DIR
     backup_path = find_newest_backup(backup_dir)
 
     if not backup_path:
-        print(f"No STG backup found in {backup_dir}")
+        say(f"No STG backup found in {backup_dir}")
         return
 
-    print(f"Reading: {backup_path.name}")
+    say(f"Reading: {backup_path.name}")
     data = scan_backup(backup_path)
-    print(f"Found: {data['total_tabs']} tabs in {data['total_groups']} groups")
+    say(f"Found: {data['total_tabs']} tabs in {data['total_groups']} groups")
 
     if args.dry_run:
-        print()
+        say()
         for g in data["groups"]:
             if g["tab_count"] > 0:
-                print(f"  {g['tab_count']:>4} tabs | {g['title']}")
+                say(f"  {g['tab_count']:>4} tabs | {g['title']}")
         return
 
     report = generate_report(data)
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report_path = REPORT_DIR / f"tab-groups-overview-{today_iso()}.md"
     report_path.write_text(report, encoding="utf-8")
-    print(f"\nReport saved: {report_path.relative_to(ROOT_DIR)}")
-    print("Run 'uv run python scripts/compile.py' to compile into wiki articles.")
-
-
-if __name__ == "__main__":
-    main()
+    say(f"\nReport saved: {report_path.relative_to(ROOT_DIR)}")
+    say("Run `wiki compile` to compile it into wiki articles.")

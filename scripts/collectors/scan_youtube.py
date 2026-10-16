@@ -12,12 +12,10 @@ Wired in two ways:
     `@register` decorator below adds `YoutubeCollector` to the Registry.
     The Collector's `run()` is the inbox-drain mode — it processes
     `raw/inbox/youtube.md` (a markdown URL list). The rich per-URL flags
-    (`--url` / `--tier` / `--no-skip`) are CLI-only, same as calendar's
-    `--year` and browser's `--source`.
-  - As a direct CLI: `wiki ingest-youtube --url URL [--tier N]`, through the
-    top-level entry script `scripts/ingest_youtube.py` (this module is a package
-    submodule `collectors/__init__.py` already imports, so it must not run as
-    `-m` or by path).
+    (`--url` / `--tier` / `--no-skip`) are CLI-only, as browser's `--source` is.
+  - As its own CLI, `main(argv)`: `wiki ingest-youtube --url URL [--tier N]`,
+    through the entry module `scripts/ingest_youtube.py`;
+    `wiki collect youtube -- <flags>` reaches the same function.
 """
 
 from __future__ import annotations
@@ -908,9 +906,8 @@ class YoutubeCollector:
     The Collector path is the **inbox-drain** mode: `run()` processes
     `raw/inbox/youtube.md` (a markdown URL list, optionally with inline
     `tier: N` directives). The rich per-URL CLI (`--url`, `--tier`,
-    `--no-skip`, playlist expansion) stays on the direct script /
-    `wiki ingest-youtube` wrapper — same split as calendar's `--year`
-    and browser's `--source`.
+    `--no-skip`, playlist expansion) is `main(argv)`, behind
+    `wiki ingest-youtube` — the same split as browser's `--source`.
 
     `piggyback_default=False`: youtube ingest is operator-paced (you drop
     URLs into the inbox, then drain when ready), not a blind daily sweep.
@@ -943,11 +940,11 @@ class YoutubeCollector:
         )
 
 
-# ── Direct CLI entry (backward-compat) ──────────────────────────────
+# ── Own CLI: `wiki ingest-youtube` (also `wiki collect youtube -- <flags>`) ──
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(prog="scan-youtube")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="wiki ingest-youtube")
     src = parser.add_mutually_exclusive_group(required=True)
     src.add_argument("--url", help="single video or playlist URL")
     src.add_argument("--inbox", help="path to a markdown file with YouTube URLs")
@@ -963,7 +960,7 @@ def main() -> int:
         "--no-skip", action="store_true", help="re-ingest videos already in raw/notes/youtube/"
     )
     parser.add_argument("--out", type=Path, default=REPORT_DIR)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     items: list[InboxItem] = []
     if args.url:

@@ -18,6 +18,40 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.33] — 2026-10-16
+
+**For your vault:** nothing to do. If you ran a collector's extra flags by path, use the
+`wiki collect <name> -- <flags>` form below.
+
+### Added
+
+- **`wiki collect <name> -- <flags>`** passes everything after `--` to the collector's own
+  command line. That covers screenshots' `--backfill 7`, `--limit 20`, `--all`,
+  `--backfill-thumbnails` and `--retrofit-batch-reports`, browser's `--source firefox`, and
+  tabs' `--backup-dir`. `wiki collect tabs -- --help` lists a collector's flags.
+  - These runs now log like the rest of `wiki collect`: to the terminal and to
+    `logs/collectors.log`.
+  - youtube's and folder-index's own flags stay where they were: `wiki ingest-youtube` and
+    `wiki index`.
+- **`wiki refresh-dashboards --dry-run`** prints the dashboard's stats and lint data as JSON,
+  plus the rendered fragments, and writes nothing.
+
+### Changed
+
+- **`wiki help` lists `refresh-dashboards`**, with its own `wiki help refresh-dashboards`.
+  The Dashboard's refresh button already ran it.
+- `wiki refresh-dashboards` refuses a word it does not know. It used to ignore it and refresh.
+
+### Removed
+
+- **The three by-path scripts `scan_screenshots.py`, `scan_browser.py` and `scan_tabs.py`.**
+  The docs taught them as `uv run --project .wiki python .wiki/scripts/scan_*.py …`. On a
+  vault in iCloud Drive that form ignored the engine's environment and rebuilt `.wiki/.venv`
+  inside the vault. The `--` form above replaces them.
+- **The docs' other bare `uv run --project .wiki` lines** in `docs/PROCESS.md` are now
+  `wiki` commands as well. For the email collector that is `wiki collect email
+  --incremental`, and for the dashboard generators `wiki refresh-dashboards [--dry-run]`.
+
 ## [0.7.32] — 2026-10-16
 
 **For your vault:** nothing to do. The home menu's letters changed, see below.

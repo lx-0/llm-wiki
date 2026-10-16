@@ -3,11 +3,11 @@
 Reads `state.json` + filesystem + cheap structural lint checks; writes a
 Markdown fragment that `dashboard.md` transcludes via `![[_dashboard-stats]]`.
 
-Runs after every flush (called from `flush.py` post-compile). Also runnable
-standalone:
+Runs after every flush (called from `flush.py` post-compile). By hand, with the lint
+fragment, through the dispatcher:
 
-    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats            # write
-    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats --dry-run  # print without writing
+    wiki refresh-dashboards             # write
+    wiki refresh-dashboards --dry-run   # print without writing
 """
 
 import os

@@ -1,11 +1,11 @@
 """Entry module for `wiki ingest-youtube` — the logic lives in `collectors.scan_youtube`.
 
-Why a separate module: `collectors/__init__.py` imports `scan_youtube` to register the
-collector, so running the package module itself with `python -m collectors.scan_youtube`
-executes it twice (once on package import, once as `__main__` — Python's runpy warns about
-exactly that, and the collector registers twice). A top-level entry module outside the
-package has one execution and no warning. `wiki collect youtube` is the Registry-shaped
-run; this entry keeps the direct CLI's `--url / --inbox / --tier` flags.
+Why a separate module: the collector module is imported by name (`collectors.MODULES`) and
+configures nothing at import. Run with `python -m`, it would execute as `__main__`, a second
+copy beside the one the registry imports, its `@register` included. This entry sets up
+logging and exits with `main`'s code. `wiki collect youtube` is the Registry-shaped run (the
+inbox drain); `main(argv)` with `--url / --inbox / --tier` is this command, and
+`wiki collect youtube -- <flags>` reaches the same function.
 """
 
 from collectors.scan_youtube import main

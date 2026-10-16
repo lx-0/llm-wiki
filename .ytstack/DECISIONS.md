@@ -2548,3 +2548,34 @@ interpreter. A test also refuses a module that `@register`s without a table row.
 **Consequence:** the criterion's parenthetical is amended in M034-CONTEXT, with the
 measurement. `preprocessors/` and `producers/` keep the eager shape; their cost was never
 the issue.
+
+## 2026-10-16: A collector's own flags go after `wiki collect <name> --`; `ingest-youtube` and `index` keep their verbs (M034-S06-T04, 0.7.33)
+
+**Context:** five collector modules have a CLI of their own, a `main()` that read `sys.argv`:
+screenshots, browser, tabs, youtube and folder-index. The last two were catalogued commands
+(`wiki ingest-youtube`, `wiki index`). The other three ran through by-path entry scripts that
+the docs taught as `uv run --project .wiki python .wiki/scripts/scan_*.py …`, a form that on
+an iCloud vault ignores the engine's environment and rebuilds `.wiki/.venv` inside the vault.
+Exit criterion 6 asked for `wiki collect <name> -- <flags>` and the three scripts deleted.
+
+**Chose:** `collectors/cli.py` splits the argv at the first `--`. With a tail, it imports the
+module from `collectors.MODULES` and exits with its `main(tail)`. The five `main`s take
+`argv`, and the three scripts are gone. The "no flags of its own" error lists the modules
+that have a `main`, computed rather than kept as a list. The Registry flags (`--dry-run`,
+`--incremental`, `--account`) beside a `--` are refused, not merged. The modules' `print(`
+calls went to `say`, and the output gate now covers every collector module `wiki collect`
+runs.
+
+**Rejected:**
+- *Removing `wiki ingest-youtube` / `wiki index` for the strict "one verb":* both are
+  catalogued commands with help, and youtube's has a menu entry. They are ingest verbs,
+  peers of `ingest-html`. The pass-through reaches their `main(argv)` too, and their parsers'
+  `prog` names the catalogued verb, so a usage line always shows a command that works.
+  Removing them would rename two working commands for the operator and gain nothing.
+- *The backlog's alternative, flags into `Collector.run(**options)`:* one seam for two
+  shapes of run (a Registry sweep, a per-URL ingest) that share no options, and an S03-sized
+  change for what the pass-through does in ~30 lines.
+
+**Consequence:** `wiki refresh-dashboards` joined the catalogue in the same task (a
+`builtin` with help and `--dry-run`): PROCESS.md's last bare lines were the dashboard
+generators'. `docs/PROCESS.md` teaches no bare `uv run --project .wiki` line now.

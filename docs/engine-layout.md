@@ -63,9 +63,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── cli.py                 ← table-driven `wiki` dispatcher — runs the catalogue (help/menu derive from it; owns the once-per-command locked dashboard refresh + `wiki auth`)
 │   ├── cli_catalog.py         ← the CommandSpec table — the single source of truth for the command catalog (+ BY_NAME, the OAuth registry AUTH_SERVICES)
 │   ├── cli_help.py            ← the per-command `wiki <cmd> --help` texts (migrated verbatim from the former bash heredocs)
-│   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
+│   ├── collectors/            ← substrate→raw/ writers (lazy Registry `MODULES` + the collectors' own CLIs + the `wiki collect` dispatcher)
 │   │   ├── base.py                ← Collector Protocol, SPEC, Registry + account-loop harness (resolve_accounts/filter_accounts/Watermark/run_account_loop) + inbox-intake harness (scan_inbox/archive_to_zone/append_rollup)
-│   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop)
+│   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop; `<name> -- <flags>` → the module's own `main(argv)`)
 │   │   ├── folder_index.py        ← body-blind folder index (entry module: scripts/index_folders.py; registered as the `folder-index` collector)
 │   │   ├── email_collector.py     ← email Collector (multi-backend via adapters/mailbox/)
 │   │   ├── jamie.py               ← Jamie AI meeting-notetaker
@@ -78,10 +78,10 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── pictures.py            ← inbox-watch camera / phone-photo ingester (vision per file + batch report)
 │   │   ├── _picture_metadata.py   ← EXIF + filename-pattern parsing behind pictures.py
 │   │   ├── capture_collector.py   ← folder-watching quick-capture intake (capture index in core/)
-│   │   ├── scan_browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
-│   │   ├── scan_screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
-│   │   ├── scan_tabs.py           ← Firefox Simple Tab Groups backups
-│   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis (entry module: scripts/ingest_youtube.py)
+│   │   ├── scan_browser.py        ← Firefox + Chrome bookmarks/history/tab-groups (own CLI: `wiki collect browser -- --source …`)
+│   │   ├── scan_screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report (own CLI: `wiki collect screenshots -- …`)
+│   │   ├── scan_tabs.py           ← Firefox Simple Tab Groups backups (own CLI: `wiki collect tabs -- --backup-dir …`)
+│   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis (own CLI: `wiki ingest-youtube`, entry module scripts/ingest_youtube.py)
 │   ├── adapters/              ← the clients collectors talk through (never substrate-aware)
 │   │   ├── calendar/google.py     ← Google Calendar v3 REST wrapper (list_calendars / list_events / get_event)
 │   │   ├── drive/google.py        ← Google Drive v3 REST wrapper behind gmeet (resolve_folder_id / list_docs / get_file / export_doc)
@@ -201,11 +201,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── clippings_sweep.py     ← thin shim → preprocessors/clippings.py (<vault>/Clippings/ → raw/articles/, pre-compile lift)
 │   ├── ingest_html.py         ← entry module for `wiki ingest-html` (logic: preprocessors/html_ingest.py)
 │   ├── process_inbox.py       ← entry module for `wiki process-inbox` (logic: preprocessors/inbox.py)
-│   ├── ingest_youtube.py      ← entry module for `wiki ingest-youtube` (logic: collectors/scan_youtube.py — the direct CLI's --url / --inbox / --tier flags)
+│   ├── ingest_youtube.py      ← entry module for `wiki ingest-youtube` (logic: collectors/scan_youtube.py — its own CLI's --url / --inbox / --tier flags)
 │   ├── index_folders.py       ← entry module for `wiki index` (logic: collectors/folder_index.py)
-│   ├── scan_screenshots.py    ← entry script for the screenshots collector's direct CLI (--all / --limit / --backfill / --backfill-thumbnails / --retrofit-batch-reports); run by path
-│   ├── scan_browser.py        ← entry script for the browser collector's direct CLI (--source firefox|chrome|all); run by path
-│   ├── scan_tabs.py           ← entry script for the tab-groups collector's direct CLI (--backup-dir); run by path
 │   ├── review_wiki.py         ← per-article quality scoring via local LLM
 │   ├── optimize_claude_md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry_failed_flushes.py ← reprocess archived flush contexts
@@ -242,11 +239,11 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 `scripts/` is the engine's source root, not a package (no `scripts/__init__.py`, ever — `tests/test_layout.py` guards it). Three shapes; which one applies depends on where the module sits:
 
-- **Top-level scripts** (`scripts/<x>.py`) run by path — `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/compile.py …` — because Python puts a script's own directory first on `sys.path`, and here that directory *is* the source root.
-- **Sub-package modules** (`core/`, `collectors/`, `migrations/`, `dashboard/`, …) run only as modules with the source root on the path — `PYTHONPATH=<vault>/.wiki/scripts uv run --project <vault>/.wiki python -m migrations.migrate_config_keys …`. By path they fail with `ModuleNotFoundError: core`. `wiki <command>` always takes this shape for you: `core/entry.py` builds the argv + env for every Python-side spawn, and the bash layer spells the same line.
+- **Top-level scripts** (`scripts/<x>.py`) run by path — the bootstrap `wiki` runs `scripts/cli.py` this way (`<venv>/bin/python <vault>/.wiki/scripts/cli.py …`) — because Python puts a script's own directory first on `sys.path`, and here that directory *is* the source root.
+- **Sub-package modules** (`core/`, `collectors/`, `migrations/`, `dashboard/`, …) run only as modules with the source root on the path — `PYTHONPATH=<vault>/.wiki/scripts <venv>/bin/python -m migrations.migrate_config_keys …`. By path they fail with `ModuleNotFoundError: core`. `wiki <command>` takes this shape for you: `cli.py` spawns every handler through `core/entry.py`, which builds the argv + env. `<venv>` is the engine's environment (hard rule above) — never a bare `uv run --project .wiki`, which on a cloud-synced vault rebuilds the environment inside the vault.
 - **Hooks** (`hooks/*.py`) are plain scripts the agent harness runs from `hooks/`; they `import _bootstrap` — the engine's one `sys.path` bootstrap — before anything from `scripts/`.
 
-A package whose `__init__` imports its modules to register them (`preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. `collectors` no longer does: its `MODULES` table names each collector's module, and `get_collector(name)` imports that one on first use (M034-S06-T03, `tests/test_collector_registry.py`; `all_collectors()`, behind `wiki collect --list`, imports them all for each one's `is_configured()`). The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`; `scan_screenshots.py` / `scan_browser.py` / `scan_tabs.py` for the three collectors' direct-CLI flags); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly, and `tests/test_layout.py` refuses a documented `uv run python …/scripts/<pkg>/<x>.py` invocation anywhere in docstrings, `docs/`, `AGENTS.md`, `README.md` or `templates/`.
+A package whose `__init__` imports its modules to register them (`preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. `collectors` no longer does: its `MODULES` table names each collector's module, and `get_collector(name)` imports that one on first use (M034-S06-T03, `tests/test_collector_registry.py`; `all_collectors()`, behind `wiki collect --list`, imports them all for each one's `is_configured()`). The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`), and a collector's own flags go through `wiki collect <name> -- <flags>` to its module's `main(argv)` (M034-S06-T04, `tests/test_collect_passthrough.py`); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly, and `tests/test_layout.py` refuses a documented `uv run python …/scripts/<pkg>/<x>.py` invocation anywhere in docstrings, `docs/`, `AGENTS.md`, `README.md` or `templates/`.
 
 ## Seams and gates
 

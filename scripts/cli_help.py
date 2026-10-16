@@ -177,6 +177,19 @@ NOTES
   on a subscription, Ollama is local. Recorded by every LLM call site into
   state/usage.json (see core/usage.py). Read-only."""
 
+H_REFRESH_DASHBOARDS = """wiki refresh-dashboards — rebuild the dashboard's stats and lint caches
+
+USAGE
+  wiki refresh-dashboards             write _dashboard-stats.md + _dashboard-lint.md
+  wiki refresh-dashboards --dry-run   print both as JSON + rendered body, write nothing
+
+NOTES
+  dashboard.md transcludes the two fragments. They refresh on their own after
+  every flush, after compile, lint, correct and take, and after seed; this is
+  the manual trigger (the Dashboard's refresh button runs it). One refresh at a
+  time: while another holds state/dashboard-refresh.lock, this one skips, and
+  the next picks up the latest state."""
+
 H_QUERY = """wiki query — ask the knowledge base in natural language
 
 USAGE
@@ -449,6 +462,7 @@ H_COLLECT = """wiki collect — run a Collector (substrate-shaped raw/ writer)
 USAGE
   wiki collect --list                  list registered Collectors
   wiki collect <name> [flags]          run one Collector
+  wiki collect <name> -- <flags>       the collector's own CLI (its flags after --)
 
 FLAGS
   --dry-run                            log what would happen, don't write to disk
@@ -459,7 +473,16 @@ EXAMPLES
   wiki collect --list                  show all registered collectors with their SPEC
   wiki collect email                   full email scan across all configured accounts
   wiki collect email --account work    one account only
-  wiki collect email --dry-run         no-op preview"""
+  wiki collect email --dry-run         no-op preview
+  wiki collect screenshots -- --backfill 7   rescan the last 7 days
+  wiki collect browser -- --source firefox   one browser only
+  wiki collect tabs -- --help          a collector's own flags
+
+NOTES
+  After --, everything goes to the collector module's main(argv): screenshots
+  (--all, --limit, --backfill, --backfill-thumbnails, --retrofit-batch-reports),
+  browser (--source), tabs (--backup-dir). youtube's and folder-index's own CLIs
+  are `wiki ingest-youtube` and `wiki index`."""
 
 H_INDEX = """wiki index — body-blind folder-index digests for watched local roots
 

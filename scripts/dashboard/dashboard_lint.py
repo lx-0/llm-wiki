@@ -7,11 +7,11 @@ transcludes section by section via `![[_dashboard-lint#Section]]` embeds.
 Runs after every flush (called from `flush.py` right after
 `dashboard_stats.py`). The structural check results are computed ONCE per
 refresh (C04): the stats run persists them via `dashboard.lint_results`; this
-script consumes that cache while fresh and only recomputes when run
-standalone:
+script consumes that cache while fresh and only recomputes when it is stale or
+absent (a dry run saves none). By hand, with the stats fragment:
 
-    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint            # write
-    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint --dry-run  # print without writing
+    wiki refresh-dashboards             # write
+    wiki refresh-dashboards --dry-run   # print without writing
 """
 
 import os

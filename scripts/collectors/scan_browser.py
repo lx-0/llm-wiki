@@ -9,10 +9,9 @@ Wired in two ways:
     `@register` decorator below adds `BrowserCollector` to the Registry;
     `flush.py` auto-spawns it as `collectors/cli.py browser` when the
     piggyback fires.
-  - As a direct CLI: `uv run --project .wiki python .wiki/scripts/scan_browser.py`
-    (the top-level entry script) keeps the `--dry-run` / `--source` flags.
-    (`--source firefox|chrome` is CLI-only; the Collector path always scans
-    every available source.)
+  - As its own CLI, `main(argv)`: `wiki collect browser -- --source firefox`
+    keeps the `--dry-run` / `--source` flags. (`--source firefox|chrome` is
+    CLI-only; the Collector path always scans every available source.)
 """
 
 from __future__ import annotations
@@ -29,6 +28,7 @@ from urllib.parse import urlparse
 
 from collectors.base import CollectorSpec, RunResult, register
 from core.config import CONFIG
+from core.console import say
 from core.errors import swallow
 from core.paths import RAW_DIR, ROOT_DIR
 from core.utils import today_iso
@@ -574,14 +574,16 @@ class BrowserCollector:
         )
 
 
-# ── Direct CLI entry (backward-compat) ──────────────────────────────
+# ── Own CLI: `wiki collect browser -- <flags>` ──────────────────────
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Scan Firefox + Chrome browser data")
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="wiki collect browser --", description="Scan Firefox + Chrome browser data"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Only show stats")
     parser.add_argument("--source", choices=["firefox", "chrome", "all"], default="all")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     ff_stg = None
     ff_places = None
@@ -589,38 +591,38 @@ def main():
     chrome_hist = None
 
     if args.source in ("firefox", "all"):
-        print("Scanning Firefox Tab Groups...")
+        say("Scanning Firefox Tab Groups...")
         ff_stg = scan_stg(STG_BACKUP_DIR)
         if ff_stg:
-            print(f"  {ff_stg['total_tabs']} tabs in {ff_stg['total_groups']} groups")
+            say(f"  {ff_stg['total_tabs']} tabs in {ff_stg['total_groups']} groups")
         else:
-            print("  No STG backup found")
+            say("  No STG backup found")
 
-        print("Scanning Firefox Bookmarks + History...")
+        say("Scanning Firefox Bookmarks + History...")
         ff_places = scan_firefox_places(FF_PLACES)
         if ff_places:
-            print(
+            say(
                 f"  {ff_places['bookmark_count']} bookmarks, {ff_places['history_total_visits']} visits"
             )
         else:
-            print("  places.sqlite not found")
+            say("  places.sqlite not found")
 
     if args.source in ("chrome", "all"):
-        print("Scanning Chrome Bookmarks...")
+        say("Scanning Chrome Bookmarks...")
         chrome_bm = scan_chrome_bookmarks(CHROME_BOOKMARKS)
         if chrome_bm:
-            print(f"  {len(chrome_bm)} bookmarks")
+            say(f"  {len(chrome_bm)} bookmarks")
         else:
-            print("  No Chrome bookmarks found")
+            say("  No Chrome bookmarks found")
 
-        print("Scanning Chrome History...")
+        say("Scanning Chrome History...")
         chrome_hist = scan_chrome_history(CHROME_HISTORY)
         if chrome_hist and not chrome_hist.get("error"):
-            print(f"  {chrome_hist['total_visits']} visits")
+            say(f"  {chrome_hist['total_visits']} visits")
         elif chrome_hist:
-            print(f"  Error: {chrome_hist['error']}")
+            say(f"  Error: {chrome_hist['error']}")
         else:
-            print("  No Chrome history found")
+            say("  No Chrome history found")
 
     if args.dry_run:
         return
@@ -629,9 +631,5 @@ def main():
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report_path = REPORT_DIR / f"browser-overview-{today_iso()}.md"
     report_path.write_text(report, encoding="utf-8")
-    print(f"\nReport saved: {report_path.relative_to(ROOT_DIR)}")
-    print("Run 'uv run python scripts/compile.py' to compile into wiki articles.")
-
-
-if __name__ == "__main__":
-    main()
+    say(f"\nReport saved: {report_path.relative_to(ROOT_DIR)}")
+    say("Run `wiki compile` to compile it into wiki articles.")

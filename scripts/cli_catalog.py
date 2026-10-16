@@ -45,6 +45,7 @@ from cli_help import (
     H_PUBLISH,
     H_QUERY,
     H_RECONCILE,
+    H_REFRESH_DASHBOARDS,
     H_REINDEX,
     H_REVIEW_WIKI,
     H_SEED,
@@ -833,6 +834,15 @@ COMMANDS: tuple[CommandSpec, ...] = (
         handler="usage_report.py",
         menu_items=(MenuItem("usage", "token-usage ledger", "tokens per provider/model"),),
         help_text=H_USAGE,
+    ),
+    # The Dashboard's refresh button runs it; refresh_after commands, flush and seed call
+    # the same locked refresh (`cli.refresh_dashboards`).
+    CommandSpec(
+        "refresh-dashboards",
+        "Review & maintenance",
+        "rebuild the dashboard's stats + lint caches",
+        kind="builtin",
+        help_text=H_REFRESH_DASHBOARDS,
     ),
     # Help
     CommandSpec("help", "Help", "this message", kind="builtin", needs_vault=False),

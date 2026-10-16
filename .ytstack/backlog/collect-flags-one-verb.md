@@ -1,6 +1,9 @@
 # `wiki collect <name>` carries the direct-CLI flags (M034 candidate)
 
-**Status:** candidate for M034 (dispatcher / surface diet). Recorded 2026-10-14 (M033-S02-T06).
+**Status:** **shipped** in M034-S06-T04 (0.7.33; DECISIONS 2026-10-16 "A collector's own
+flags go after `wiki collect <name> --`"). The proposal below was taken as written; the three
+by-path scripts are deleted. `wiki ingest-youtube` and `wiki index` keep their verbs, and the
+pass-through reaches their `main(argv)` too. Recorded 2026-10-14 (M033-S02-T06).
 
 **Today:** four collectors keep flags only their direct CLI offers — `scan_screenshots`
 (`--all`, `--limit N`, `--backfill DAYS`, `--backfill-thumbnails`, `--retrofit-batch-reports`),

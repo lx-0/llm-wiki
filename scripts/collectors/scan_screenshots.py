@@ -5,14 +5,11 @@ and save as raw notes for wiki compilation.
 Runs as a daily piggyback task. Tracks last scan timestamp in state file.
 
 Usage — `wiki collect screenshots` is the Registry run (what the piggyback spawns); the
-direct CLI with its extra flags is the top-level entry script `scripts/scan_screenshots.py`
-(this module is a package submodule `collectors/__init__.py` imports, so it runs neither as
-`-m` nor by path):
-    uv run --project .wiki python .wiki/scripts/scan_screenshots.py                    # scan new screenshots
-    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --all               # all without sidecar
-    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --all --limit 50    # batch of 50
-    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill 7        # last 7 days
-    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --dry-run           # show what would be processed
+flags only this module's own CLI (`main(argv)`) offers go after `--`:
+    wiki collect screenshots -- --all               # all without sidecar
+    wiki collect screenshots -- --all --limit 50    # batch of 50
+    wiki collect screenshots -- --backfill 7        # last 7 days
+    wiki collect screenshots -- --dry-run           # show what would be processed
 """
 
 from __future__ import annotations
@@ -33,6 +30,7 @@ import httpx
 from collectors.base import CollectorSpec, RunResult, register
 from core import ollama_client
 from core.config import CONFIG, TIMEZONE
+from core.console import say
 from core.paths import RAW_DIR, STATE_DIR
 from core.prompts import prompt_model, render
 from core.state_store import StateStore, store_for
@@ -416,8 +414,8 @@ def scan(
         for s in screenshots:
             ts = parse_screenshot_timestamp(s)
             ts_str = ts.strftime("%Y-%m-%d %H:%M") if ts else "?"
-            print(f"  [{ts_str}] {s.name} ({s.stat().st_size // 1024}KB)")
-        print(f"\n{len(screenshots)} screenshots would be processed.")
+            say(f"  [{ts_str}] {s.name} ({s.stat().st_size // 1024}KB)")
+        say(f"\n{len(screenshots)} screenshots would be processed.")
         return {
             "processed": 0,
             "report_path": None,
@@ -623,11 +621,14 @@ class ScreenshotsCollector:
         )
 
 
-# ── Direct CLI entry (backward-compat) ──────────────────────────────
+# ── Own CLI: `wiki collect screenshots -- <flags>` ──────────────────
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Scan screenshots with local LLM vision")
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="wiki collect screenshots --",
+        description="Scan screenshots with local LLM vision",
+    )
     parser.add_argument(
         "--all",
         action="store_true",
@@ -651,7 +652,7 @@ def main() -> None:
         action="store_true",
         help="Add ![[thumb/...]] embeds to existing batch reports",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.backfill_thumbnails:
         backfill_thumbnails(dry_run=args.dry_run)
     elif args.retrofit_batch_reports:

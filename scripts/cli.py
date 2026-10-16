@@ -122,6 +122,28 @@ def refresh_dashboards() -> None:
     flush.refresh_dashboard_lint()
 
 
+def run_refresh_dashboards(rest: list[str]) -> int:
+    """`wiki refresh-dashboards [--dry-run]`: both caches once, locked; `--dry-run` runs each
+    generator's own `--dry-run` (its JSON and rendered body, no write). The exit code is the
+    first generator's failure, else 0."""
+    if rest and rest[0] in ("-h", "--help", "help"):
+        _print_help_text(BY_NAME["refresh-dashboards"])
+        return 0
+    if rest == ["--dry-run"]:
+        import flush
+
+        codes = [
+            _run_child(handler, ["--dry-run"])
+            for handler in (flush.DASHBOARD_STATS_HANDLER, flush.DASHBOARD_LINT_HANDLER)
+        ]
+        return next((code for code in codes if code), 0)
+    if rest:
+        _err(f"unknown: wiki refresh-dashboards {rest[0]} (try 'wiki help refresh-dashboards')")
+        return 1
+    refresh_dashboards()
+    return 0
+
+
 # ── Help rendering ──────────────────────────────────────────────────────
 
 
@@ -262,8 +284,7 @@ def main(argv: list[str]) -> int:
         print(render_help())
         return 0
     if cmd == "refresh-dashboards":
-        refresh_dashboards()
-        return 0
+        return run_refresh_dashboards(rest)
     if cmd == "auth":
         return run_auth(rest)
     command = BY_NAME.get(cmd)

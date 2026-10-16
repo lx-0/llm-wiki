@@ -406,16 +406,20 @@ flowchart LR
 | `collectors/jamie.py` | Collector Registry | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) — **multi-tenant** via `personal.accounts.<id>.jamie` (`kind: jamie-api`), je Account ein eigener `api_key_env` | Pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event, `account_id`, `key_type`) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via per-account `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
 | `collectors/gmeet.py` | Collector Registry | Google Drive API v3 über `adapters/drive/google.py` (`drive.meet.readonly` scope, OAuth via `core/google_oauth.py`). **Zwei Discovery-Quellen** (`discovery = folder-scan ∪ email-link-scan`): (1) **Folder-Scan** — Gemini-Transcript- + Notes-Docs aus dem eigenen "Meet Recordings"-Drive-Ordner (per-account `last_seen_ts` Watermark). (2) **Email-Discovery** (`gmeet.email_discovery`, default on) — scannt die Mailbox des Accounts (`resolve_reader`, gleiche Adapter wie der email-collector) nach `gemini-notes@google.com`-Mails und folgt dem `docs.google.com/document/d/<id>`-Link im HTML-Body. Fängt **fremd-erstellte, org-geteilte** Meetings, die nie im eigenen Drive-Ordner landen (`drive.meet.readonly` liest sie pro Meet-Herkunft, nicht pro Owner). Windowed Re-Scan (`backfill_days`) + Drive-file-id-Dedup → idempotent ohne Email-Watermark; nur Folder-Docs rücken den Folder-Watermark vor. | **Ein Meeting → ein Markdown-File**: frontmatter (`doc_kinds: [...]` Liste, `drive_docs: [{id, name, kind, url, created}]` Liste, `started_at`) + paired `## Summary` (Notes-Doc) + `## Transcript` (Transcript-Doc) Sections. Cross-run merge via stable `meeting_key` (sha256 des normalisierten Title — Whitespace + Quote-Glyph-Varianten gestrippt): landet Notes in Run N + Transcript in Run N+1, mergt Run N+1 die zweite Section in die existierende Datei statt Duplikat. Beide Discovery-Quellen füllen dieselbe Stub-Liste; die zweischichtige Skip-existing-Logik (Filename-Suffix + jede `drive_docs[*].id` im Frontmatter) verhindert Doppel-Writes. Drive-folder-id Auto-Resolve emittiert WARNING mit aufgelöster ID damit operator pinnen kann (Workspace-Kollisions-Schutz). Meet REST API deferred (organizer-only + 30-Tage-Expiry), siehe `.ytstack/backlog/gmeet-collector.md`. | `raw/transcripts/gmeet/<date>--<slug>--<meeting-key>.md` |
 | `collectors/calendar_collector.py` | Collector Registry | Google Calendar v3 (`calendar.readonly` scope, OAuth via `core/google_oauth.py`) — **multi-tenant** via `personal.accounts.<id>.calendar` (`kind: google-calendar`), per-account Token-Cache | **Ein Markdown-File pro Datum** (`raw/notes/calendar/<YYYY-MM-DD>.md`): frontmatter (`event_count`, `meeting_hours`, `focus_hours`, `people`, `event_ids`) + per-event Body-Block (`## HH:MM–HH:MM · Title` + `- **Calendar:** …`, `- **Attendees:** …`, `- **Recurring:** [[concepts/<slug>\|Title]]`, `- **Transcript:** [[…\|gmeet]]`). Recurring-Series collapsen einmal in `knowledge/concepts/<slug>.md` (echte Concept-Page mit `type: concept` + `series: true` + `tags: [meeting, recurring]`); jede Instanz im Date-Rollup linkt dort hin. Same-Date Cross-Link mit `raw/transcripts/{gmeet,jamie}/` via Title-Slug fuzzy-match. Sentinel-delimited managed region (`<!-- calendar:events:begin/end -->`) — operator-Prose außerhalb übersteht jede Regeneration. Multi-Calendar via `include:` list (default = alle `selected: true` Calendars, sonst primary). Jeder Lauf listet das ganze Fenster (`backfill_days` zurück, `future_days` voraus, tagesgenau) und rendert jedes Datum aus ALLEN seinen Events — dieselbe Event-ID aus zwei Calendars einmal; geschrieben wird nur, was sich geändert hat. Ein Datum wird nur aus einem vollständigen Listing neu geschrieben: fehlt ein Account oder Calendar (Fehler, `--account`-Lauf neben weiteren Accounts) oder kappt `max_per_run` ein Listing, bleiben die Rollups stehen und die Run-Message sagt warum. (Bis 0.7.0 schrieb der `--incremental`-Lauf jedes berührte Datum nur aus den seit dem `updatedMin`-Watermark geänderten Events neu — alle anderen Events dieses Datums fielen heraus.) | `raw/notes/calendar/<YYYY-MM-DD>.md` + `knowledge/concepts/<slug>.md` für recurring series | `raw/notes/calendar/<YYYY-MM-DD>.md` + `knowledge/concepts/<slug>.md` für recurring series |
-| `collectors/scan_browser.py` | Collector Registry | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. Multi-source, ein Collector. `--source` ist CLI-only. | `raw/notes/browser/` |
+| `collectors/scan_browser.py` | Collector Registry | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. Multi-source, ein Collector. `--source` gibt es nur im eigenen CLI (`wiki collect browser -- --source firefox`). | `raw/notes/browser/` |
 | `collectors/scan_tabs.py` | Collector Registry | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
 | `collectors/scan_screenshots.py` | Collector Registry (piggyback) | `~/Screenshots/` (macOS PNG-Dump) | Lokales Vision-Modell pro Screenshot (das `model:` im Frontmatter von `prompts/scan_screenshots_vision.md` schlägt `models.vision_model`; der Sidecar-Stempel `vision_model` nennt das Modell, das lief), batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
-| `collectors/scan_youtube.py` | Collector Registry | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File. Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. `run()` = inbox-drain (`raw/inbox/youtube.md`); `--url`/`--tier`/`--no-skip` sind CLI-only. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
+| `collectors/scan_youtube.py` | Collector Registry | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File. Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. `run()` = inbox-drain (`raw/inbox/youtube.md`); `--url`/`--tier`/`--no-skip` sind das eigene CLI, `wiki ingest-youtube`. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 | `collectors/voice.py` | Collector Registry | Folder-watch auf `personal.voice_inbox` — `.txt` / `.md` Dateien die von beliebigen Dictation-Tools dort abgelegt werden (iOS Shortcut → iCloud Drive ist der mobile-primary Pfad; OpenWhispr / FluidVoice / macOS-Dictation / Hammerspoon-Snippet als Mac-Alternativen). | Pro Source-Datei ein Markdown-File: frontmatter (`type: voice-note`, `origin: voice-intake`, `captured_at`, `source`, `tags: [voice]`) + Body verbatim. Source nach Ingest in `<voice_inbox>/.processed/` archiviert (Archive-Move IST der Dedup-Mechanismus, kein State-File). Slug aus den ersten 6 Wörtern. Same-Minute-Slug-Kollision: Seconds-Suffix. | `raw/voice/voice-<date>-<HHMM>-<slug>.md` |
 | `collectors/health.py` | Collector Registry | Oura REST API (`api.ouraring.com/v2`, Bearer PAT) — **multi-tenant** via `personal.accounts.<id>.health.oura` (`kind: oura-pat`), je Account ein eigener `api_key_env`. Vier Endpoints pro Run: `/daily_sleep` (score-only), `/daily_readiness` (score + temp-deltas), `/daily_activity` (steps + activity scores), `/sleep` (session-level — `total_sleep_duration`, `average_hrv`, `lowest_heart_rate`; mehrere Rows/Tag möglich → Adapter pickt longest-duration-Session pro Tag, Naps zählen nicht für Overnight-Baselines). | Pro (Account, Tag) ein Markdown-File: numerische Frontmatter (`sleep_hours` / `sleep_score` / `readiness_score` / `hrv_overnight` / `steps` / `resting_hr`) mit `sensitivity: high`, None-Werte werden gedroppt statt `null` zu rendern. Skip-existing per Filename; incremental via per-account `state['<id>']['oura']['last_day']` (ISO date, watermark-on-success-only). Phase 1 — Oura only; HealthKit XML Drop-Folder ist Phase 2 backlogged. | `raw/notes/health/<year>/<date>--<account>.md` |
+| `collectors/wispr.py` | Collector Registry (piggyback, 6 h) | Wispr Flow Meetings über die HTTP-API der Desktop-App — **multi-tenant**, pull-only (der Sync-Request schickt immer eine leere Meeting-Liste, nie Upload/Delete). Die Session-Dateien der App dienen nur der Auth; fehlen oder verfallen sie, bricht der Lauf mit Login-Hinweis ab. | Pro Meeting ein Markdown-File; ein Content-Hash pro Meeting in State entscheidet über Neu-Schreiben. | `raw/transcripts/wispr/<date>--<slug>--<id>.md` |
+| `collectors/pictures.py` | Collector Registry (piggyback, 6 h) | Folder-watch auf `personal.picture_inbox` (iOS Shortcut, AirDrop, Kopie) | gemma4-Vision pro Foto mit eigenem Foto-Prompt (Szene / Objekte / Handlung / sichtbarer Text). Der Batch-Report zeigt alle Bilder; nur `keep`-Zeilen erreichen den Compile (`picture-batch` → `compile_pictures.md`). Archive-Move unter `raw/inbox-mobile/pictures/` ist der Dedup, wie bei voice. | `raw/notes/pictures/pictures-<slug>.md` + Sidecar `.md` neben dem Archiv-Bild |
+| `collectors/capture_collector.py` | Collector Registry (piggyback, 1 h) | Folder-watch auf `personal.capture_inbox` (`.txt` / `.md` / `.html`) | Quick-Capture-Notizen mit stabiler, inhaltsabgeleiteter Capture-ID (erste 12 Hex von `sha256(content)`); gleicher Inhalt überschreibt dieselbe Datei. `state/capture_index.json` ist die Brücke zur Korrektur-Schleife. Source-Archiv unter `raw/inbox-mobile/captures/`. | `raw/captures/capture-<id12>.md` |
+| `collectors/folder_index.py` | Collector Registry (manuell) | `personal.watched_folders` (kind=local) | Body-blind: `scandir` + `stat`, nie ein Datei-Body. Vollständiger Baum + Top-N jüngste Änderungen, Delta-Skip bei unverändertem Baum; compile-skipped. Einzel-Root + `--force` über `wiki index`. | `raw/index/<root-id>.md` |
 
 > **Hinweis Collector-Pattern**: Phase 2 abgeschlossen (2026-05-14) — **alle Substrate-Scanner laufen auf dem Collector Registry Pattern.**
 > - **Collector Registry** (`scripts/collectors/base.py`): Klassen mit `SPEC`-Deklaration + `@register`-Decorator + `run(dry_run, incremental) → RunResult`. `flush.py` entdeckt Piggyback-Collectors automatisch über `piggyback_collectors()` Registry-walk. Operator-CLI: `wiki collect <name>` über `scripts/collectors/cli.py`.
-> - **Registry-Collectors:** `email`, `jamie`, `gmeet`, `voice`, `health`, `tabs`, `calendar`, `browser`, `screenshots`, `youtube` — alle zehn. Migrierte Scanner haben snake_case-Dateinamen (`scan_tabs.py` etc.) und behalten ihren Direct-CLI-Einstieg für rich Per-URL/-Flag-Bedienung.
+> - **Registry-Collectors:** `calendar`, `email`, `folder-index`, `gmeet`, `health`, `jamie`, `wispr`, `browser`, `screenshots`, `tabs`, `youtube`, `pictures`, `voice`, `capture` — alle vierzehn, als Name → Modul-Tabelle `collectors.MODULES` (lazy: `wiki collect <name>` importiert nur sein Modul). Collectors mit eigenen Flags (`screenshots`, `browser`, `tabs`) erreicht man über `wiki collect <name> -- <flags>` (das `main(argv)` des Moduls); youtube und folder-index haben dafür eigene Verben (`wiki ingest-youtube`, `wiki index`).
 > - **`_BUILTIN_PIGGYBACK_TASKS`** in `core/piggybacks.py` (bis 2026-07-18 `_LEGACY_PIGGYBACK_COMMANDS`) trägt ausschließlich Nicht-Substrate-Tasks — teils historisch (`lint_structural`, `review_wiki`, `optimize_claude_md`, `retry_failed_flushes`, `curiosity_followup`), teils bewusst als Nicht-Collector gebaut (`daily_digest_yesterday`, `dream_cycle`, `study_run_due`, `analyst_pass2`, `concept_reconcile`, `health_trends`).
 
 > **Secrets**: `JAMIE_<ACCOUNT>_API_KEY` (multi-tenant — eine pro Account-Sub-Block) + alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*` liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
@@ -461,9 +465,6 @@ Zusätzlich spiegelt der incremental-Lauf pro Account einen **kompakten Block na
 ./.wiki/wiki collect email --incremental                    # delta only (default in piggyback)
 ./.wiki/wiki collect email --dry-run                        # no writes
 
-# Equivalent direct invocation (what the dispatcher spawns — scripts/ on PYTHONPATH, module form):
-PYTHONPATH=.wiki/scripts uv run --project .wiki python -m collectors.cli email --incremental
-
 # YouTube — Single video at default tier (1 = transcript)
 ./.wiki/wiki ingest-youtube --url "https://youtu.be/<id>"
 
@@ -482,9 +483,9 @@ PYTHONPATH=.wiki/scripts uv run --project .wiki python -m collectors.cli email -
 ./.wiki/wiki collect calendar                                  # full run: from the account's `since:` when set
 ./.wiki/wiki calendar-auth <account-id>                        # one-time OAuth bootstrap
 
-# Browser — Registry run, or the direct CLI (top-level entry script) for --source
+# Browser — Registry run (every source), or the collector's own CLI after -- for --source
 ./.wiki/wiki collect browser
-uv run --project .wiki python .wiki/scripts/scan_browser.py --source firefox
+./.wiki/wiki collect browser -- --source firefox
 ```
 
 ### Edge Cases
@@ -817,13 +818,13 @@ flowchart TD
 ### Script
 
 ```bash
-./.wiki/wiki collect screenshots                                                   # Registry-Lauf (was der Piggyback spawnt)
-# Die Extra-Flags gibt es nur im direkten CLI — das Top-Level-Entry-Skript scripts/scan_screenshots.py:
-uv run --project .wiki python .wiki/scripts/scan_screenshots.py --dry-run          # nur zeigen was gescannt würde
-uv run --project .wiki python .wiki/scripts/scan_screenshots.py --limit 20         # max 20 Screenshots pro Lauf
-uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill 7       # letzte 7 Tage nachscannen
-uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
-uv run --project .wiki python .wiki/scripts/scan_screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
+./.wiki/wiki collect screenshots                                        # Registry-Lauf (was der Piggyback spawnt)
+# Die Extra-Flags hat nur das eigene CLI des Collectors — nach `--`:
+./.wiki/wiki collect screenshots -- --dry-run                           # nur zeigen was gescannt würde
+./.wiki/wiki collect screenshots -- --limit 20                          # max 20 Screenshots pro Lauf
+./.wiki/wiki collect screenshots -- --backfill 7                        # letzte 7 Tage nachscannen
+./.wiki/wiki collect screenshots -- --backfill-thumbnails               # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
+./.wiki/wiki collect screenshots -- --retrofit-batch-reports            # adde ![[thumb/...]] zu existierenden Batch-Reports
 ```
 
 ### Edge Cases
@@ -854,7 +855,7 @@ uv run --project .wiki python .wiki/scripts/scan_screenshots.py --retrofit-batch
 
 ### Dashboard-Stats-Refresh
 
-`dashboard.md` zeigt einen Engine-Status-Callout (pending compiles, failed flushes, lint warnings, total cost) per Transklusion `![[_dashboard-stats]]`. Die Werte stehen als Frontmatter + gerenderter Callout in `_dashboard-stats.md` am Vault-Root.
+`dashboard.md` zeigt einen Engine-Status-Callout (pending compiles, failed flushes, lint warnings, Tokens) per Transklusion `![[_dashboard-stats]]`. Die Werte stehen als Frontmatter + gerenderter Callout in `_dashboard-stats.md` am Vault-Root.
 
 `scripts/dashboard/dashboard_stats.py` regeneriert die Datei. Der Refresh ist **synchron post-flush** (kein Piggyback) — `flush.py:refresh_dashboard_stats()` ruft das Script direkt nach `maybe_trigger_compile` auf, sodass die Counts immer den letzten Flush widerspiegeln. Best-effort: ein Crash blockiert den Flush nicht.
 
@@ -872,19 +873,19 @@ Der Inhalt der Frontmatter:
 ### Script
 
 ```bash
-PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats             # Refresh
-PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats --dry-run   # Stats als JSON ausgeben, nichts schreiben
+./.wiki/wiki refresh-dashboards             # Stats + Lint neu schreiben (der Refresh-Button im Dashboard)
+./.wiki/wiki refresh-dashboards --dry-run   # beide als JSON + gerenderten Body ausgeben, nichts schreiben
 ```
 
 ### Edge Cases
 
 - **Erstinstallation, noch kein Flush gelaufen:** `install.sh` seedet `_dashboard-stats.md` als Placeholder mit Nullen, sodass die Transklusion in `dashboard.md` nicht broken aussieht.
-- **`dashboard_stats.py` crasht:** Der Aufruf in `flush.py` ist `check=False` mit 30s Timeout; ein Fehler wird geloggt, der Flush-Pfad läuft normal weiter.
+- **`dashboard_stats.py` crasht:** Der Aufruf in `flush.py` ist `check=False` mit Timeout `limits.dashboard_refresh_timeout_s` (Default 300 s); ein Fehler wird geloggt, der Flush-Pfad läuft normal weiter.
 - **MOCs-Ordner fehlt noch (vor S04):** `knowledge/MOCs/` ist leer — das Dashboard zeigt keinen MOC-Block. Wird nachgereicht in M003-S04.
 
 ### Lint-Triage-Refresh
 
-Parallel zu `_dashboard-stats.md` schreibt `scripts/dashboard/dashboard_lint.py` die Datei `_dashboard-lint.md` ans Vault-Root — gleicher Trigger-Pfad (`flush.py:refresh_dashboard_lint()` direkt nach `refresh_dashboard_stats`, plus `wiki lint` / `wiki seed` / `wiki compile` / `wiki correct` über die Shell-Wrapper-Helfer `_refresh_dashboard_lint`).
+Parallel zu `_dashboard-stats.md` schreibt `scripts/dashboard/dashboard_lint.py` die Datei `_dashboard-lint.md` ans Vault-Root — gleicher Trigger-Pfad (`flush.py:refresh_dashboard_lint()` direkt nach `refresh_dashboard_stats`, plus nach `wiki compile` / `wiki lint` / `wiki correct` / `wiki take` — `refresh_after` im Katalog — und nach `wiki seed`, alle über `cli.refresh_dashboards`).
 
 `dashboard.md`-Section "🛡 Lint triage" rendert vier collapsible Obsidian-Callouts. Counts kommen aus dem `_dashboard-lint.md`-Frontmatter via DataviewJS; Body ist Section-Embed:
 
@@ -899,10 +900,7 @@ Empty Queue → `[!success] Title (0)` (auto-collapsed, grün). Non-empty → `[
 
 Refresh ist Best-effort wie bei stats — `flush.py:refresh_dashboard_lint()` capturet stderr und loggt `WARNING` bei non-zero Exit (preemptiver S07-T02-Pattern), blockiert aber niemals den Flush.
 
-```bash
-PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint              # Refresh
-PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint --dry-run    # Lint-Daten als JSON, nichts schreiben
-```
+Manuell: `wiki refresh-dashboards [--dry-run]` (siehe Dashboard-Stats-Refresh oben) — beide Fragmente in einem Lauf.
 
 ### MOC-Layer
 

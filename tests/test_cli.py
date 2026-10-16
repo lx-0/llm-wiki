@@ -330,6 +330,41 @@ def test_main_refresh_dashboards(monkeypatch):
     assert called["n"] == 1
 
 
+def test_refresh_dashboards_dry_run_prints_both_payloads_and_writes_nothing(spy, monkeypatch):
+    """`--dry-run` runs both generators' own `--dry-run` (their JSON, no write) — the form
+    PROCESS.md taught as two bare `uv run --project .wiki` lines (M034-S06-T04)."""
+    ran: list[tuple[str, list[str]]] = []
+    monkeypatch.setattr(cli, "_run_child", lambda rel, args: ran.append((rel, list(args))) or 0)
+    assert cli.main(["refresh-dashboards", "--dry-run"]) == 0
+    assert ran == [
+        ("dashboard/dashboard_stats.py", ["--dry-run"]),
+        ("dashboard/dashboard_lint.py", ["--dry-run"]),
+    ]
+    assert spy["refreshed"] is False
+
+
+def test_refresh_dashboards_dry_run_exit_is_the_first_failure(monkeypatch):
+    codes = iter([0, 3])
+    monkeypatch.setattr(cli, "_run_child", lambda script_rel, args: next(codes))
+    assert cli.main(["refresh-dashboards", "--dry-run"]) == 3
+
+
+def test_refresh_dashboards_help_and_unknown_words(spy, capsys):
+    assert cli.main(["refresh-dashboards", "--help"]) == 0
+    assert "--dry-run" in capsys.readouterr().out
+    assert cli.main(["refresh-dashboards", "now"]) == 1
+    assert "unknown: wiki refresh-dashboards now" in capsys.readouterr().err
+    assert spy["refreshed"] is False
+
+
+def test_refresh_dashboards_is_in_the_catalogue():
+    """The Obsidian button and PROCESS.md run it; `wiki help` did not list it."""
+    command = cli.BY_NAME["refresh-dashboards"]
+    assert command.kind == "builtin"
+    assert command.help_text
+    assert "refresh-dashboards" in cli.render_help()
+
+
 # ── Home & status, ported from bash (M034-S01-T05) ──────────────────────
 
 
