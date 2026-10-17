@@ -19,9 +19,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-import core.daily_capture as daily_capture
 import core.flush_pipeline as fp
 import retry_failed_flushes as retry
+from core import daily_capture
 from core.config import TIMEZONE
 
 TZ = ZoneInfo(TIMEZONE)

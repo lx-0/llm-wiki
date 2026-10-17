@@ -144,15 +144,21 @@ def patch_engine_paths(monkeypatch: pytest.MonkeyPatch, vault: Path, scratch: Pa
     # first import (scan_screenshots.SCREENSHOTS_DIR, scan_browser.CHROME_PROFILE). If the
     # oracle were the first importer, those constants would be born under the scratch HOME
     # and OUTLIVE this test's monkeypatch — later tests would see a vanished tmp path.
-    # Importing the package here, before HOME changes, keeps the module-level values real;
-    # the explicit setattr below is what this test sees, and monkeypatch restores it.
-    import collectors  # noqa: F401
+    # Importing every collector module here, before HOME changes, keeps the module-level
+    # values real; the explicit setattr below is what this test sees, and monkeypatch
+    # restores it. The package itself imports none of them (lazy registry, M034-S06-T03).
+    import importlib
+
+    import collectors
     import doctor
     import menu_context
     from collectors import scan_screenshots
     from core import health
 
     from ._health_paths import patch_health_path
+
+    for module in collectors.MODULES.values():
+        importlib.import_module(module)
 
     wiki = vault / ".wiki"
     knowledge = vault / "knowledge"

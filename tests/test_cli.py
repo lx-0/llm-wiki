@@ -343,10 +343,13 @@ def test_refresh_dashboards_dry_run_prints_both_payloads_and_writes_nothing(spy,
     assert spy["refreshed"] is False
 
 
-def test_refresh_dashboards_dry_run_exit_is_the_first_failure(monkeypatch):
+def test_refresh_dashboards_dry_run_exit_is_the_first_failure(spy, monkeypatch):
+    # `spy` stubs the real refresh too: this test's RED run (S06-T04), before `--dry-run`
+    # existed, ran it and wrote `_dashboard-*.md` next to the checkout (its ROOT_DIR).
     codes = iter([0, 3])
     monkeypatch.setattr(cli, "_run_child", lambda script_rel, args: next(codes))
     assert cli.main(["refresh-dashboards", "--dry-run"]) == 3
+    assert spy["refreshed"] is False
 
 
 def test_refresh_dashboards_help_and_unknown_words(spy, capsys):

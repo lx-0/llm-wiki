@@ -37,7 +37,9 @@ def _write(path: Path, text: str) -> None:
 
 
 def test_today_session_log_reaches_the_session(hook):
-    _write(hook.DAILY_DIR / _day() / "sessions.md", "# Daily Sessions\n\nworked on the dispatcher\n")
+    _write(
+        hook.DAILY_DIR / _day() / "sessions.md", "# Daily Sessions\n\nworked on the dispatcher\n"
+    )
 
     out = hook.read_recent_daily()
 

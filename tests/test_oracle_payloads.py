@@ -7,6 +7,9 @@ or the desktop app can see in `wiki menu --json`, `wiki doctor --quick --json` a
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -57,6 +60,34 @@ def test_doctor_quick_json_matches_golden(oracle, capsys, monkeypatch, request) 
 
 def test_help_matches_golden(oracle, request) -> None:
     assert_matches_golden(request, "help.txt", normalise(help_text(), placeholders=oracle))
+
+
+def test_patching_loads_every_collector_before_home_moves(tmp_path: Path) -> None:
+    """A collector module first imported under the scratch HOME freezes its `Path.home()`
+    constants there (`scan_browser.CHROME_PROFILE`) and outlives the test — `doctor --quick`
+    reaches `all_collectors()` after the patch. `import collectors` used to import them all;
+    since the registry went lazy (M034-S06-T03) it imports none. A fresh interpreter, because
+    in the suite another test has usually imported them first."""
+    probe = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "import pytest\n"
+        "import collectors\n"
+        "from tests import _oracle\n"
+        f"root = Path({str(tmp_path)!r})\n"
+        "(root / 'scratch').mkdir()\n"
+        "vault = _oracle.build_fixture_vault(root)\n"
+        "_oracle.patch_engine_paths(pytest.MonkeyPatch(), vault, root / 'scratch')\n"
+        "collectors.all_collectors()\n"
+        "print(sys.modules['collectors.scan_browser'].CHROME_PROFILE)\n"
+    )
+    paths = [REPO_ROOT / "scripts", REPO_ROOT / "hooks", REPO_ROOT]
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(str(p) for p in paths)}
+    done = subprocess.run(
+        [sys.executable, "-c", probe], cwd=REPO_ROOT, env=env, capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    assert str(tmp_path) not in done.stdout
 
 
 def test_comparer_reports_a_one_word_title_change(oracle, capsys) -> None:
