@@ -18,6 +18,30 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.8.1] — 2026-10-17
+
+### Added
+
+- `wiki publish` preserves the original directory tree and exact bytes, including
+  standalone assets, the original index and empty directories, on producer-v3 servers.
+  Searchable article projections and existing article identities remain intact.
+- `--backfill` attaches originals to existing articles; `--move OLD=NEW` reconciles file
+  and folder moves with stable identities, including atomic path swaps. Dry runs report
+  the original-file plan without changing local or remote state.
+
+### Changed
+
+- Publishing journals durable operation IDs and verifies remote original hashes before
+  acknowledging writes. Interrupted requests can resume; concurrent revisions conflict.
+- Ambiguous moves leave deletions pending across runs. `--confirm-deletions` approves
+  reviewed removals; `--accept-scope-change` approves reviewed root changes. Missing roots,
+  rejected uploads and incomplete inventories never authorize archives.
+
+**For your vault:** upgrade the meinKontext server to producer contract v3 first. Review
+`wiki publish --backfill --dry-run --json` and `wiki publish --dry-run --json` before
+activation; the engine update does not enable a disabled publisher. Keep a private journal
+backup and consistent source snapshot. [Setup and recovery](docs/setup-publish.md).
+
 ## [0.8.0] — 2026-10-16
 
 0.8.0 closes M034, released step by step from 0.7.4 to 0.7.34: the `wiki` command is a

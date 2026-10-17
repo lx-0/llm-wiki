@@ -90,7 +90,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── domain/mail.py         ← pure mailbox domain types (frozen dataclasses shared by readers, filters, collectors)
 │   ├── intents/               ← intent dispatch: Intent record + Handler Protocol + Registry (base.py), the handlers (task_handler.py / idea_handler.py / note_handler.py), _record.py writer → workspace/inbox/
 │   ├── bridge/                ← `wiki bridge` — rsync-based inbox bridge (cli.py, drive_sync.py)
-│   ├── publish/               ← `wiki publish` — mirror knowledge/ into meinkontext: cli, corpus, delta (content-hash), describe, render, executor, client (MCP JSON-RPC), oauth, bootstrap
+│   ├── publish/               ← `wiki publish` — sync publish.roots into meinkontext: sources (complete original inventory), source_sync (CAS/receipts/read-back), source_moves (atomic identity-preserving moves); cli, corpus, delta, describe, render, executor, client (MCP JSON-RPC), oauth, bootstrap for article projections
 │   ├── preprocessors/         ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons)
 │   │   ├── base.py                ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
 │   │   ├── cli.py                 ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
