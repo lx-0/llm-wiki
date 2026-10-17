@@ -18,6 +18,64 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.8.2] — 2026-10-17
+
+### Fixed
+
+- **Security: `wiki query` could change any file in the vault.** Its agent, the desktop
+  app's Ask included, ran with edits auto-accepted and the default toolset. The read modes
+  now have no Write, Edit or Bash at all, and `--file-back` writes only `knowledge/qa/`,
+  `knowledge/index.md` and the operations log. `wiki correct apply` and the concept
+  reconciliation run under the project's settings only, without Bash, and treat the vault
+  as subject matter, never as instructions.
+- **Session capture.**
+  - The subscription CLI's "You've hit your session limit" is a rate limit and is retried,
+    not filed as a crash.
+  - A retried flush lands under the day its session was staged, not the day of the retry.
+    If that day already holds a newer block of the session, the newer block stays and no
+    extraction is spent.
+  - A reply that continues the transcript (`## User` / `## Assistant` turns) or answers
+    the session instead of summarizing it is a failed attempt and is retried; it no longer
+    reaches `daily/` as the session's summary, and `wiki doctor`'s flush check can name it.
+  - A conversation with nothing worth keeping ends without a daily block; before, the
+    model's "nothing to extract" prose was written to `daily/` as the summary.
+  - The session-start hook injects today's sessions again; since May it read the
+    next-day digest instead.
+- **Collectors read the newest data.** A capped deep scan of an IMAP folder or a
+  Thunderbird mbox (curiosity asks for 50) took the oldest messages: one live folder
+  returned mail from 2019. The browser collector copied Firefox's history without its
+  write-ahead log and missed recent visits and bookmarks.
+- **The bridge LaunchAgent template** sets a PATH that holds uv: under launchd `wiki`
+  stopped with "uv not found" before `wiki bridge sync` ran. It also names
+  `<vault>/.wiki/wiki` as the program instead of an engine checkout.
+- **The MOC templates' Dataview queries** had `"final-only"SORT` glued together since
+  May; one clause per line again.
+- **Help and docs that promised what does not exist:** dollar cost caps in `wiki dream` and
+  `wiki reconcile` (the gates are size, tokens and counts since May), three flags of
+  `wiki analyze` and the hint to run one of them, "NAS indexing lands in S06", YouTube Tier 3
+  "on the backlog" (local Tier 3 ships), the legacy Gmail client file as the only one, the
+  "60kb" compile gate (it is 400,000 characters). The screenshot and picture compile
+  prompts no longer claim the tags came from gemma4.
+
+### Changed
+
+- The retry drain's log names the depth of its queue: "Found 353 archived flush(es) —
+  retrying 5 this run". It used to say "Found 5".
+
+**For your vault:**
+
+1. Coming from 0.7.3 or older (0.5.x included): follow 0.8.0's steps below first.
+2. `wiki update`.
+3. If you run the bridge LaunchAgent, install it again from
+   `.wiki/templates/.launchd/com.llm-wiki.bridge.plist.template`, with your uv directory
+   in `__UV_DIR__`.
+4. `wiki seed --check` lists the four seeded MOC pages (`knowledge/MOCs/areas`, `concepts`,
+   `people`, `projects`) as drifted. If you never edited one, `wiki seed
+   knowledge/MOCs/<name>.md --force` takes the fixed query; otherwise put
+   `SORT file.name ASC` on its own line by hand.
+5. Concept pages compiled from screenshot batches may say "Surfaced via gemma4 vision
+   pass" although a different model tagged the batch; correct them by hand if it matters.
+
 ## [0.8.1] — 2026-10-17
 
 ### Added
