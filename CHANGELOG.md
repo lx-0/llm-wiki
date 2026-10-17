@@ -24,21 +24,29 @@ in the same commit.
 thin start-up script in front of one Python dispatcher, and the surfaces you read are cut to
 what you use.
 
-**For your vault** — once, if your engine is 0.7.3 or older:
+**For your vault** — once, whatever engine you come from (0.5.x included):
 
 1. `wiki update`. The old engine pulls and hands over to the new one, which syncs the
    environment and migrates `config.yaml` (with a backup).
 2. `wiki seed`, then restart Obsidian: the dashboard buttons' wiring changed (0.7.20), and
    the plugins read their settings at startup. `wiki seed --check` shows first what it
    would change.
-3. If you keep overlays in `.wiki/custom/`, capture them again before any
+3. The desktop app: a build from before 0.6.0 does not understand what the engine reports
+   since then. Rebuild it from the engine checkout (`cd .wiki/desktop && npm ci && npm run
+   reinstall`) or install a DMG built from this release. An unsigned app may need its Full
+   Disk Access granted again after the rebuild.
+4. If you keep overlays in `.wiki/custom/`, capture them again before any
    `wiki seed --force` (0.7.23): `wiki seed --check` names the drifted files.
-4. On a vault in iCloud Drive or `~/Library/CloudStorage`: if `wiki doctor` reports a stale
+5. On a vault in iCloud Drive or `~/Library/CloudStorage`: if `wiki doctor` reports a stale
    in-vault `.wiki/.venv` (an install before 0.7.31 could leave one), delete it with the
    line it prints. The engine never deletes it for you.
-5. Run one `wiki compile`. The update, the desktop app's calls, the Obsidian buttons, the
+6. Run one `wiki compile`. The update, the desktop app's calls, the Obsidian buttons, the
    shortcut and `wiki setup` ran end to end on a scratch vault from the real 0.7.3 installer;
    a real model call could not run there.
+
+Optional: the first calendar run re-renders its window from all of each date's events
+(0.7.1); for older dates, set `since:` on the account's `calendar:` block and run
+`wiki collect calendar` once, without `--incremental`.
 
 What you will notice: the home menu's letters follow `wiki help`'s groups (0.7.32);
 `wiki help <command>` prints that command's help (0.7.30); a collector's own flags go after
