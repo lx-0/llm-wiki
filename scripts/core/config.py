@@ -500,6 +500,10 @@ def _cli(argv: list[str] | None = None) -> int:
     path`, which `config_cli` runs through here with its own argv (M034-S02-T02)."""
     import argparse
 
+    # Imported here, not at the top: every engine module imports core.config, and only this
+    # command path writes output (M034-S06-T07: the output gate follows imports).
+    from core.console import say
+
     p = argparse.ArgumentParser(description="Wiki config introspection / mutation")
     sub = p.add_subparsers(dest="cmd")
     sub.add_parser("show", help="Print full resolved config (default)")
@@ -515,41 +519,41 @@ def _cli(argv: list[str] | None = None) -> int:
     if args.cmd in (None, "show"):
         import json
 
-        print(f"# {CONFIG_FILE} (exists={CONFIG_FILE.exists()})")
-        print(json.dumps(asdict(CONFIG), indent=2, default=str))
+        say(f"# {CONFIG_FILE} (exists={CONFIG_FILE.exists()})")
+        say(json.dumps(asdict(CONFIG), indent=2, default=str))
         return 0
 
     if args.cmd == "path":
-        print(CONFIG_FILE)
+        say(CONFIG_FILE)
         return 0
 
     if args.cmd == "keys":
         for k in _enumerate_keys("", CONFIG):
-            print(k)
+            say(k)
         return 0
 
     if args.cmd == "get":
         try:
             val = _walk(CONFIG, args.key.split("."))
         except KeyError as e:
-            print(e, file=__import__("sys").stderr)
+            say(e, file=__import__("sys").stderr)
             return 1
         if is_dataclass(val) and not isinstance(val, type):
             import json
 
-            print(json.dumps(asdict(val), indent=2, default=str))
+            say(json.dumps(asdict(val), indent=2, default=str))
         else:
-            print(val)
+            say(val)
         return 0
 
     if args.cmd == "set":
         try:
             current = _walk(CONFIG, args.key.split("."))
         except KeyError as e:
-            print(e, file=__import__("sys").stderr)
+            say(e, file=__import__("sys").stderr)
             return 1
         if is_dataclass(current) and not isinstance(current, type):
-            print(
+            say(
                 f"Refusing to set {args.key!r} — it's a section, not a leaf. "
                 f"Set individual fields under it instead.",
                 file=__import__("sys").stderr,
@@ -558,10 +562,10 @@ def _cli(argv: list[str] | None = None) -> int:
         try:
             coerced = _coerce(args.value, current)
         except ValueError as e:
-            print(e, file=__import__("sys").stderr)
+            say(e, file=__import__("sys").stderr)
             return 1
         _set_in_yaml(args.key, coerced)
-        print(f"set {args.key} = {coerced!r}")
+        say(f"set {args.key} = {coerced!r}")
         return 0
 
     return 0

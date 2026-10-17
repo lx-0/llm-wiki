@@ -25,6 +25,7 @@ from pathlib import Path
 
 import httpx
 
+from core.console import say
 from core.paths import STATE_DIR
 from core.state_store import StateStore
 from publish.client import PublishClientError
@@ -206,7 +207,7 @@ def mint_interactive(
     if consent is not None:
         code = consent(auth_url)
     else:
-        print(f"Open in your browser (login + consent):\n\n  {auth_url}\n")
+        say(f"Open in your browser (login + consent):\n\n  {auth_url}\n")
         webbrowser.open(auth_url)
         assert wait is not None
         code = wait()

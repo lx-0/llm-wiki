@@ -22,7 +22,7 @@ from pathlib import Path
 
 from core import frontmatter, ollama_client
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.entry import child_env, python_m
 from core.paths import (
     INBOX_DIR,
@@ -155,7 +155,7 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         if ext in (".html", ".htm"):
             log.info("  HTML detected → ingesting in-process (mode=both)")
             if dry_run:
-                print(f"  {file_path.name} → raw/articles/ (extract) + raw/inbox-wiki/ (original)")
+                say(f"  {file_path.name} → raw/articles/ (extract) + raw/inbox-wiki/ (original)")
                 results.append(
                     {
                         "source": file_path.name,
@@ -194,7 +194,7 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         if ext in EXTENSION_MAP:
             log.info("  Binary intake (%s) → archive-only", ext)
             if dry_run:
-                print(f"  {file_path.name} → raw/inbox-wiki/ (binary-only, no artifact)")
+                say(f"  {file_path.name} → raw/inbox-wiki/ (binary-only, no artifact)")
                 results.append(
                     {
                         "source": file_path.name,
@@ -246,7 +246,7 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         }
 
         if dry_run:
-            print(
+            say(
                 f"  {file_path.name} → {target_path.relative_to(ROOT_DIR)} + raw/inbox-wiki/{file_path.name}"
             )
             results.append(result)
@@ -316,14 +316,14 @@ def main() -> None:
     if not results:
         return
 
-    print(f"\nProcessed {len(results)} files")
+    say(f"\nProcessed {len(results)} files")
     for r in results:
-        print(f"  {r['source']} → {r['category']} → {r['target']}")
+        say(f"  {r['source']} → {r['category']} → {r['target']}")
 
     if args.dry_run or args.no_compile:
         return
 
     # Trigger compilation — as a module in the current venv's interpreter
     # (core.entry), so we don't depend on uv being on PATH.
-    print("\nTriggering compilation...")
+    say("\nTriggering compilation...")
     subprocess.run(python_m("compile.py"), env=child_env(), cwd=str(WIKI_DIR), check=False)

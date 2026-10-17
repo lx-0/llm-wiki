@@ -25,7 +25,7 @@ import json
 import logging
 
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import ROOT_DIR, SESSIONS_DIR
 from core.utils import now_iso
 from dashboard.lint_results import LintResults, compute_lint_results, load_fresh_cache
@@ -178,9 +178,9 @@ def main() -> int:
                 "last_updated_ts",
             )
         }
-        print(json.dumps(meta, indent=2))
-        print()
-        print(body)
+        say(json.dumps(meta, indent=2))
+        say()
+        say(body)
         return 0
 
     out = write_dashboard_lint(data, body)

@@ -24,7 +24,7 @@ import logging
 import re
 from pathlib import Path
 
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, STATE_DIR
 from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 
@@ -121,6 +121,6 @@ def main() -> None:
     setup_console_logging("clippings")
     n = sweep()
     if n == 0:
-        print("clippings-sweep: nothing to move")
+        say("clippings-sweep: nothing to move")
     else:
-        print(f"clippings-sweep: moved {n} file(s) into raw/articles/")
+        say(f"clippings-sweep: moved {n} file(s) into raw/articles/")

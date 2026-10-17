@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import sys
 
+from core.console import say
+
 
 def _is_header(line: str) -> bool:
     stripped = line.strip()
@@ -26,9 +28,9 @@ def print_help(text: str) -> None:
     """One help text: the title line and the ALL-CAPS section headers bold when stdout is a
     terminal (the old bash heredocs' styling), plain text otherwise."""
     if not sys.stdout.isatty():
-        print(text)
+        say(text)
         return
-    print(
+    say(
         "\n".join(
             f"\033[1m{line}\033[0m" if i == 0 or _is_header(line) else line
             for i, line in enumerate(text.splitlines())

@@ -22,7 +22,7 @@ import logging
 from datetime import UTC, datetime
 
 from core import frontmatter
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, ROOT_DIR, SESSIONS_DIR
 from core.utils import (
     list_wiki_articles,
@@ -281,9 +281,9 @@ def main() -> int:
     callout = render_callout(stats)
 
     if args.dry_run:
-        print(json.dumps(stats, indent=2))
-        print()
-        print(callout)
+        say(json.dumps(stats, indent=2))
+        say()
+        say(callout)
         return 0
 
     save_cache(lint_results)

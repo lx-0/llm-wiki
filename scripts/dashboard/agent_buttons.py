@@ -23,6 +23,7 @@ from pathlib import Path
 
 from core import markers
 from core.agent_spec import AgentSpec, parse_spec
+from core.console import say
 from core.paths import AGENT_SPECS_DIR
 
 REGION_BEGIN = "<!-- agent-buttons:begin -->"
@@ -37,7 +38,7 @@ def discover() -> list[AgentSpec]:
         try:
             spec = parse_spec(path)
         except Exception as exc:
-            print(
+            say(
                 f"# warn: skipping {path.name} — invalid spec: {exc}",
                 file=sys.stderr,
             )

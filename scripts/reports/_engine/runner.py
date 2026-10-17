@@ -38,6 +38,7 @@ from pathlib import Path
 
 import yaml
 
+from core.console import say
 from core.prompts import render
 from reports._engine.instrument import Instrument, load_instrument
 from reports._engine.lib.inference import (
@@ -377,9 +378,9 @@ def _plan_batches(instrument: Instrument, omit_ids: set[str]) -> list[InferenceB
         if filtered:
             batches.append(type(b)(label=b.label, items=filtered))
     if not batches:
-        print("  all items operator-answered — skipping SDK call entirely.", flush=True)
+        say("  all items operator-answered — skipping SDK call entirely.", flush=True)
     else:
-        print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
+        say(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
     return batches
 
 
@@ -425,7 +426,7 @@ def _infer_one_batch(
         substrate_block=substrate_block,
     )
     prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
-    print(
+    say(
         f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
         f"prompt_version={prompt_version}",
         flush=True,
@@ -444,7 +445,7 @@ def _infer_one_batch(
         **infer_kwargs,
     )
     dt = time.perf_counter() - t0
-    print(
+    say(
         f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
         f"/{len(result.items)}  "
         f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s",
@@ -468,18 +469,18 @@ def run_inference(
     if not instrument_dir.is_dir():
         raise FileNotFoundError(f"Instrument not found: {instrument_dir}")
 
-    print(f"Loading instrument: {instrument_dir}", flush=True)
+    say(f"Loading instrument: {instrument_dir}", flush=True)
     instrument = load_instrument(instrument_dir)
     lookback_days = instrument.meta.inference.default_lookback_days
-    print(
+    say(
         f"  slug={instrument.meta.slug} v{instrument.meta.version}  "
         f"items={instrument.total_items}  lookback={lookback_days}d",
         flush=True,
     )
 
-    print("Resolving substrate scope...", flush=True)
+    say("Resolving substrate scope...", flush=True)
     paths = resolve_substrate_files(vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days)
-    print(f"  {len(paths)} files matched.", flush=True)
+    say(f"  {len(paths)} files matched.", flush=True)
 
     # Build prompt vars
     today = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -491,7 +492,7 @@ def run_inference(
     operator_answers = _load_operator_answers(study_dir, instrument.meta.slug)
     omit_ids = set(operator_answers.keys())
     if operator_answers:
-        print(
+        say(
             f"  operator-supplied answers: {len(operator_answers)} item(s) — "
             f"{sorted(operator_answers.keys())} (excluded from inference)",
             flush=True,
@@ -540,7 +541,7 @@ def run_inference(
     # over inferred. Operator wins where both exist.
     answers = {**run.answers, **operator_answers}
     scored = score_instrument(instrument_dir, answers)
-    print(
+    say(
         f"\nScore: total={scored.score.total}  band={scored.band}  "
         f"coverage={scored.coverage_pct}%  bandable={scored.bandable}",
         flush=True,
@@ -566,12 +567,12 @@ def run_inference(
     # bad report shouldn't block the rest of a multi-instrument run.
     verification = verify_report(report_path)
     if not verification.ok:
-        print(
+        say(
             f"  ⚠ embedded-methodology check FAILED: {verification.summary}",
             flush=True,
         )
 
-    print(f"\nReport persisted: {report_path}", flush=True)
+    say(f"\nReport persisted: {report_path}", flush=True)
     return report_path
 
 
@@ -595,7 +596,7 @@ def main() -> int:
             output_dir=args.output_dir,
         )
     except Exception as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        say(f"ERROR: {exc}", file=sys.stderr)
         import traceback
 
         traceback.print_exc()

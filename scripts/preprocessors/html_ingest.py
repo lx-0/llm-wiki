@@ -37,7 +37,7 @@ import httpx
 
 from core import ollama_client
 from core.config import CONFIG
-from core.console import setup_console_logging
+from core.console import say, setup_console_logging
 from core.entry import child_env, python_m
 from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, WIKI_DIR
 from core.utils import slugify, today_iso
@@ -319,7 +319,7 @@ def main() -> None:
 
     result = ingest(args.source, args.mode, args.model, compile=not args.no_compile)
     if result:
-        print(f"\nIngested: {result.relative_to(ROOT_DIR)}")
+        say(f"\nIngested: {result.relative_to(ROOT_DIR)}")
     else:
-        print("Ingest failed")
+        say("Ingest failed")
         sys.exit(1)
