@@ -180,6 +180,14 @@ class ContextMcpClient:
             raise ToolCallError(tool_text(result) or f"{name}: tool error")
         return result
 
+    def list_tools(self) -> dict:
+        self._ensure_initialized()
+        return self._rpc("tools/list", {})
+
+    def read_resource(self, uri: str) -> dict:
+        self._ensure_initialized()
+        return self._rpc("resources/read", {"uri": uri})
+
     def close(self) -> None:
         self._http.close()
 

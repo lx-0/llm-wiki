@@ -128,7 +128,7 @@ NOTES
   features.health_trends (off -> dry-run). Spec:
   .ytstack/backlog/health-trend-synthesis.md."""
 
-H_PUBLISH = """wiki publish — mirror the vault's markdown into meinkontext (producer contract)
+H_PUBLISH = """wiki publish — sync original wiki files and articles into meinkontext (producer v3)
 
 USAGE
   wiki publish --auth                one-time connect: browser login + consent
@@ -137,6 +137,10 @@ USAGE
   wiki publish --dry-run --json      machine-readable plan (GUI/agent seam)
   wiki publish                       execute the plan (idempotent by content hash)
   wiki publish --piggyback           cadence mode; quiet no-op while publish.enabled is false
+  wiki publish --backfill --dry-run   plan original-file bindings for existing articles
+  wiki publish --move OLD=NEW         preserve identity after a file/folder move (repeatable)
+  wiki publish --confirm-deletions    approve reviewed removals left pending as possible moves
+  wiki publish --accept-scope-change  approve a reviewed change to publish.roots
 
 SETUP
   1. wiki config set publish.enabled true
@@ -145,11 +149,11 @@ SETUP
   Full runbook: docs/setup-publish.md
 
 NOTES
-  One-way mirror of every markdown file under `publish.roots` (engine
-  default: knowledge/; add raw/, daily/, reports/, workspace/ to publish the
-  substrate too) into ONE managed wiki on the operator's meinkontext server
-  (context-mcp; binding contract: docs/PRODUCER-CONTRACT.md in that repo).
-  Unchanged articles are never re-sent; local deletes archive upstream.
+  Original paths and bytes of every file under publish.roots, including
+  binaries, the original index and empty folders; markdown also has an article
+  projection. Requires producer v3 support on the server. Review the dry run
+  before enabling publication. Unchanged files are never re-sent; uncertain
+  moves keep deletions pending across runs. Read-back precedes journal updates.
 """
 
 H_REINDEX = """wiki reindex — reconcile knowledge/index.md against the corpus
