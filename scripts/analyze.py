@@ -2,14 +2,14 @@
 
 Sub-commands / flags:
 
-    wiki analyze                          # Pass-1 over all studies, then Pass-2
-    wiki analyze --study <id>             # Pass-1 on one study's latest run
-    wiki analyze --all-studies            # Pass-1 over every study's latest run
-    wiki analyze --cross-study            # Pass-2 only
-    wiki analyze --pass2-only             # alias for --cross-study
+    wiki analyze                          # Pass-1 over every study's latest run, then Pass-2
+    wiki analyze --study <id>             # Pass-1 on one study's latest run, then Pass-2
+    wiki analyze --cross-study-only       # Pass-2 only
     wiki analyze --study <id> --no-pass2  # Pass-1 only on one study
+    wiki analyze --rerun                  # overwrite existing _analysis.md files
+    wiki analyze --vault <path>           # analyse another vault root
 
-Default flow when no flags: --all-studies + --cross-study (full analyst sweep).
+Default flow when no flags: Pass-1 over every study, then Pass-2 (full analyst sweep).
 
 Prompt-building + persistence live in the analyst library
 (`scripts.reports._engine.lib.analyst`); this CLI is a thin driver that
@@ -128,7 +128,10 @@ def cmd_pass2(args: argparse.Namespace, vault_root: Path) -> int:
         studies_with.append((study, summary, analysis))
 
     if not studies_with:
-        say("(no studies with completed Pass-1 outputs — run `wiki analyze --all-studies` first)")
+        say(
+            "(no studies with completed Pass-1 outputs — `wiki analyze` without "
+            "`--cross-study-only` runs Pass-1 first; a study needs a `wiki study run` before)"
+        )
         return 0
 
     say(

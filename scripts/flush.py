@@ -47,9 +47,17 @@ from core.sdk_helpers import FailureClass, SdkCallSpec, is_fatal, run_sdk_query
 from core.state_store import StateStore, is_ingested, store_for, try_locked
 
 # The context's turn headings (`hooks/_transcript.py`). A reply that carries them continued
-# the session instead of distilling it — five such blocks sit in the live daily/ (last
-# 2026-09-04), permanent because the context is deleted after a write (M034-S06-T07).
+# the session instead of distilling it — 46 such blocks sit in the live daily/ (45 Claude
+# Code, 1 Codex; last 2026-09-04), permanent because the context is deleted after a write
+# (M034-S06-T07).
 _TRANSCRIPT_TURN = re.compile(r"^## (User|Assistant)\s*$", re.MULTILINE)
+# A distill is sections under headings (`flush_extract.md`), at the prompt's H2 or at H1. A
+# reply with none answered the session's last message instead ("Ehrlich: …", live
+# daily/2026-09-05).
+_SECTION = re.compile(r"^#{1,6} \S", re.MULTILINE)
+# The prompt's one reply for a conversation with nothing worth keeping: the context is
+# consumed and no block written. As a failure it would wait in the retry archive for good.
+NOTHING_TO_SAVE = "NOTHING_TO_SAVE"
 
 DAILY_DIR = ROOT_DIR / "daily"
 STATE_DIR = WIKI_DIR / "state"  # *.json runtime artifacts (hash trackers, cooldowns)
@@ -127,8 +135,27 @@ MAX_RETRIES = CONFIG.limits.flush_max_retries
 RETRY_DELAY = CONFIG.limits.flush_retry_delay_seconds
 
 
+def _misshapen(reply: str) -> FailureClass:
+    """Why a reply the call returned is still no distill — a failed attempt, never written."""
+    if _TRANSCRIPT_TURN.search(reply):
+        return FailureClass(
+            "transcript_echo",
+            "the reply continued the session's transcript (## User / ## Assistant turns) "
+            "instead of distilling it — not written",
+        )
+    return FailureClass(
+        "no_sections",
+        "the reply has no section — it answered the conversation instead of distilling "
+        "it — not written",
+    )
+
+
 async def extract_from_context(context: str) -> str | None:
     """Use Claude to extract structured knowledge from a conversation context.
+
+    Returns the distill (sections under headings), `NOTHING_TO_SAVE` when the
+    conversation holds nothing worth keeping, or ``None`` when every attempt
+    failed — an SDK failure or a reply in the wrong shape (`_misshapen`).
 
     Runs through the one SDK harness (`run_sdk_query`), not a hand-rolled
     `query()` loop. The harness classifies a structured error — a
@@ -168,14 +195,23 @@ async def extract_from_context(context: str) -> str | None:
             # harness default — the 2026-08-14→25 outage root cause (M031-S01).
         )
         outcome = await run_sdk_query(prompt, spec)
-        if outcome.ok and not _TRANSCRIPT_TURN.search(outcome.result_text or ""):
-            return outcome.result_text or None
+        reply = outcome.result_text or ""
+        if outcome.ok:
+            if reply.strip().strip("`") == NOTHING_TO_SAVE:
+                return NOTHING_TO_SAVE
+            if _SECTION.search(reply) and not _TRANSCRIPT_TURN.search(reply):
+                return reply
 
-        last_failure = outcome.failure or FailureClass(
-            "transcript_echo",
-            "the reply continued the session's transcript (## User / ## Assistant turns) "
-            "instead of distilling it — not written",
-        )
+        last_failure = outcome.failure or _misshapen(reply)
+        if outcome.ok:
+            # The harness logged the call a success. The doctor's flush check names the
+            # newest failure from this shape — `kind=` after the label, as the harness has it.
+            log.warning(
+                "%s ✗ reply rejected — kind=%s · %s",
+                spec.label,
+                last_failure.kind,
+                last_failure.detail,
+            )
         if is_fatal(last_failure):
             log.error(
                 "Claude extraction failed with a fatal kind=%s — not retrying "
@@ -354,8 +390,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Extract a daily entry with the Claude Agent SDK (LLM cost applies).",
         epilog=(
             "Use only a disposable UTF-8 Markdown copy of conversation context. "
-            "The file is deleted after success, duplicate-skip or empty input; "
-            "failed extraction moves it to .wiki/sessions/failed-flushes/. "
+            "The file is deleted after success, duplicate-skip, empty input or a "
+            "conversation with nothing worth keeping; failed extraction moves it to "
+            ".wiki/sessions/failed-flushes/. "
             "Evening flushes may also trigger compilation and piggyback tasks."
         ),
     )
@@ -416,6 +453,12 @@ async def main() -> None:
         kind="session-end",
         created=int(time.time()),
     )
+
+    if extracted == NOTHING_TO_SAVE:
+        log.info("Nothing worth keeping in session %s — no daily block", session_id)
+        flush_pipeline.mark_complete(staged)
+        _record_flush(session_id)
+        return
 
     if not extracted:
         try:

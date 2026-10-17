@@ -62,7 +62,8 @@ INPUT
   for a new capture; repeated IDs are subject to the session dedup window.
 
 CONSUMED FILE
-  The input is deleted after success, on duplicate-skip and when empty.
+  The input is deleted after success, on duplicate-skip, when empty and when the
+  conversation holds nothing worth keeping (no daily block is written then).
   Failed extraction moves it into .wiki/sessions/failed-flushes/ for retry.
   Pass only a disposable copy, never an original project or vault file.
 
@@ -110,8 +111,11 @@ USAGE
 NOTES
   Signal-driven: consumes lint.check_facts_violations and auto-reconciles
   knowledge/concepts/ articles against the hard facts they contradict, via a
-  strict scope-locked correct_apply (per-fact + per-run cost caps,
-  per-fact cooldown). Concept-concept contradictions + quality are
+  strict scope-locked correct_apply. Structural gates, no dollar caps: a fact
+  that touches more than limits.concept_reconcile_max_files_per_fact concepts
+  is left for review, limits.concept_reconcile_max_facts_per_run facts per run,
+  scheduling.concept_reconcile_cooldown_days per fact. Concept-concept
+  contradictions + quality are
   PROPOSE-ONLY (left in wiki lint / the dashboard). Default OFF + dry-run;
   flip features.concept_reconciliation to enable --apply.
   Spec: .ytstack/backlog/concept-consistency-routine.md."""
@@ -714,8 +718,11 @@ USAGE
 
 NOTES
   Sweeps `knowledge/{people,projects,areas}/*.md` oldest-synthesized first,
-  skipping entities synthesized within the cooldown window. Per-entity AND
-  per-run cumulative cost caps are enforced — see `wiki dream-entity help`.
+  skipping entities synthesized within the cooldown window. Gates are size and
+  tokens, never dollars: an entity whose prompt exceeds
+  `limits.dream_entity_max_prompt_chars` is skipped before its SDK call (see
+  `wiki dream-entity help`), and the sweep stops once its real tokens cross
+  `limits.dream_cycle_max_tokens_per_run`.
   `--all-entities` / `sweep` are accepted as legacy aliases."""
 
 H_DREAM_ENTITY = """wiki dream-entity — re-synthesize ONE entity page (M014)

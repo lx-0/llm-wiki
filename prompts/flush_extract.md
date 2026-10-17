@@ -20,6 +20,8 @@ Bullet list of insights, patterns, or gotchas discovered about the tooling, code
 ## Action Items
 Bullet list of tasks that were identified but not completed.
 
+Your reply is these sections and nothing else — you summarize the conversation, you never continue it or answer its last message. If nothing in it is worth keeping, reply with exactly `NOTHING_TO_SAVE` and nothing else.
+
 ---
 
 Here is the conversation context:

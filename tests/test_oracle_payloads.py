@@ -84,7 +84,12 @@ def test_patching_loads_every_collector_before_home_moves(tmp_path: Path) -> Non
     paths = [REPO_ROOT / "scripts", REPO_ROOT / "hooks", REPO_ROOT]
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(str(p) for p in paths)}
     done = subprocess.run(
-        [sys.executable, "-c", probe], cwd=REPO_ROOT, env=env, capture_output=True, text=True
+        [sys.executable, "-c", probe],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert done.returncode == 0, done.stderr[-2000:]
     assert str(tmp_path) not in done.stdout

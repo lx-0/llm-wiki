@@ -72,9 +72,13 @@ def _reached(module: str) -> set[str]:
                 stem = ".".join([*parent, stem]) if stem else ".".join(parent)
             names.add(stem)
             names.update(f"{stem}.{alias.name}" for alias in node.names)
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if node.value.endswith(".py") and (SCRIPTS / node.value).is_file():
-                spawned.add(node.value)
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.endswith(".py")
+            and (SCRIPTS / node.value).is_file()
+        ):
+            spawned.add(node.value)
     return spawned | {f for name in names if (f := _module_file(name)) is not None}
 
 

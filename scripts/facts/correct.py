@@ -148,7 +148,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 
     if path.exists() and not args.force:
         log.error(
-            "%s already exists. Use `facts/correct.py edit %s` or pass --force.",
+            "%s already exists. Use `wiki correct edit %s` or pass --force.",
             path,
             slug,
         )

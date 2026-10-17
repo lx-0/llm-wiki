@@ -67,7 +67,7 @@ _BUILTIN_PIGGYBACK_TASKS: dict[str, list[str]] = {
     "daily_digest_yesterday": ["daily_digest_runner.py", "--date", "yesterday"],
     # M014 dream-cycle. Sweeps the N most-overdue entity pages (oldest
     # last_synthesized_at first) and resynthesizes their State + Timeline
-    # from the full substrate corpus. Per-run cost cap is enforced inside
+    # from the full substrate corpus. The per-run token ceiling is enforced inside
     # dream.py via limits.dream_cycle_max_tokens_per_run; this template
     # just hands over max_per_run as the entity-count ceiling.
     "dream_cycle": ["dream.py", "piggyback", "--limit", "{max_per_run}"],

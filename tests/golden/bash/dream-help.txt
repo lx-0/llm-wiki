@@ -13,7 +13,10 @@ USAGE
 
 NOTES
   Sweeps `knowledge/{people,projects,areas}/*.md` oldest-synthesized first,
-  skipping entities synthesized within the cooldown window. Per-entity AND
-  per-run cumulative cost caps are enforced — see `wiki dream-entity help`.
+  skipping entities synthesized within the cooldown window. Gates are size and
+  tokens, never dollars: an entity whose prompt exceeds
+  `limits.dream_entity_max_prompt_chars` is skipped before its SDK call (see
+  `wiki dream-entity help`), and the sweep stops once its real tokens cross
+  `limits.dream_cycle_max_tokens_per_run`.
   `--all-entities` / `sweep` are accepted as legacy aliases.
 --- stderr ---

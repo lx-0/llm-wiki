@@ -205,7 +205,8 @@ Mutating. Confirm with the operator before each, and report what landed.
   a disposable UTF-8 Markdown file with relevant conversation context: requests,
   decisions, outcomes and unresolved work. The command does not locate the
   current conversation automatically. Use a unique session ID for a new capture.
-  **The file is consumed:** deleted after success, duplicate-skip or empty input;
+  **The file is consumed:** deleted after success, duplicate-skip, empty input or a
+  conversation with nothing worth keeping (no block is written);
   moved into `.wiki/sessions/failed-flushes/` if extraction fails. Always pass a
   disposable copy, never an original project or vault file. Output lands in
   `daily/YYYY-MM-DD/sessions.md`; evening runs may trigger compilation with

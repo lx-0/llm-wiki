@@ -1,14 +1,16 @@
 """
 Retry previously-failed flush extractions from `.wiki/sessions/failed-flushes/`.
 
-When flush.py cannot extract (rate limit, API error), the context file is
-archived instead of deleted. This script retries them one by one — on success,
-the context goes into the daily log of the day it was staged (not the retry day)
-and leaves the archive; on repeated failure, it stays archived for the next run.
-A day that already holds a newer block of the same session keeps it: the retry is
-then redundant and spends no extraction.
+When flush.py cannot extract (rate limit, API error, a reply in the wrong shape),
+the context file is archived instead of deleted. This script retries them one by
+one, oldest first — on success, the context goes into the daily log of the day it
+was staged (not the retry day) and leaves the archive; a conversation with nothing
+worth keeping (`NOTHING_TO_SAVE`) leaves it without a block; on repeated failure,
+it stays archived for the next run. A day that already holds a newer block of the
+same session keeps it: the retry is then redundant and spends no extraction.
 
-Runs as a daily piggyback task.
+Runs as a daily piggyback task, `--limit` contexts per run; the log names the
+queue's depth.
 
 Usage:
     uv run python scripts/retry_failed_flushes.py
@@ -30,7 +32,7 @@ os.environ["CLAUDE_INVOKED_BY"] = "flush_retry"
 from core import flush_pipeline
 from core.config import CONFIG
 from core.console import setup_console_logging
-from flush import ERRORS_LOG_FILE, LOG_FILE, extract_from_context
+from flush import ERRORS_LOG_FILE, LOG_FILE, NOTHING_TO_SAVE, extract_from_context
 
 log = logging.getLogger("retry-failed-flushes")
 
@@ -65,6 +67,11 @@ async def retry_one(staged: flush_pipeline.StagedFlush, dry_run: bool) -> bool:
     log.info("Retrying %s (%d chars)", staged.path.name, len(context))
     extracted = await extract_from_context(context)
 
+    if extracted == NOTHING_TO_SAVE:
+        log.info("Nothing worth keeping in %s — dropping it", staged.path.name)
+        flush_pipeline.mark_complete(staged)
+        return True
+
     if not extracted:
         log.warning("Retry failed — keeping %s in archive", staged.path.name)
         return False
@@ -76,12 +83,13 @@ async def retry_one(staged: flush_pipeline.StagedFlush, dry_run: bool) -> bool:
 
 
 async def main_async(dry_run: bool, limit: int) -> None:
-    archived = list(flush_pipeline.pending(limit=limit))
-    if not archived:
+    queue = list(flush_pipeline.pending())
+    if not queue:
         log.info("No archived flushes to retry")
         return
 
-    log.info("Found %d archived flush(es)", len(archived))
+    archived = queue[:limit]
+    log.info("Found %d archived flush(es) — retrying %d this run", len(queue), len(archived))
 
     succeeded = 0
     for staged in archived:
