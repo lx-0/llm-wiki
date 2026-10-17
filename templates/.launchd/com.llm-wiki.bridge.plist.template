@@ -10,10 +10,14 @@
   Install (replace placeholders inline first):
     1. Copy this file to
          ~/Library/LaunchAgents/com.llm-wiki.bridge.plist
-    2. Replace `__WIKI_BINARY__` with the absolute path to your wiki
-       binary (the bash dispatcher, e.g. /Users/<you>/llm-wiki/wiki).
-    3. Replace `__WIKI_DIR__` with the engine repo path (parent of the
-       wiki binary).
+    2. Replace `__WIKI_BINARY__` with the absolute path to your vault's
+       engine bootstrap, `<vault>/.wiki/wiki` (it finds the engine and the
+       vault from its own path, so the agent's working directory does not
+       matter).
+    3. Replace `__UV_DIR__` with the directory that holds uv — run
+       `dirname "$(command -v uv)"` in your shell. launchd starts the agent
+       with PATH=/usr/bin:/bin:/usr/sbin:/sbin, where `wiki` stops with
+       "uv not found".
     4. Replace `__LOG_DIR__` with an absolute path for stdout/stderr
        (e.g. /Users/<you>/Library/Logs/llm-wiki).
     5. Adjust `StartInterval` (seconds between runs). 1800 = 30 min.
@@ -45,8 +49,8 @@
 
     <key>EnvironmentVariables</key>
     <dict>
-        <key>WIKI_DIR</key>
-        <string>__WIKI_DIR__</string>
+        <key>PATH</key>
+        <string>__UV_DIR__:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
 
     <key>StartInterval</key>

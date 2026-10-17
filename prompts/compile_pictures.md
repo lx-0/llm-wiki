@@ -14,7 +14,7 @@ ${source_content}
 
 ## Your task — extract concepts from photo evidence, sparingly
 
-A picture batch is a vision-LLM summary of 1-20 camera / phone photos from the operator's `picture_inbox`. Each photo has been tagged with `scene_description / setting / objects / action / text_visible / tags / relevance` by gemma4. Most camera photos are NOT knowledge artifacts — your job is to find the few that are.
+A picture batch is a vision-LLM summary of 1-20 camera / phone photos from the operator's `picture_inbox`. Each photo has been tagged with `scene_description / setting / objects / action / text_visible / tags / relevance` by a local vision model. Most camera photos are NOT knowledge artifacts — your job is to find the few that are.
 
 You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **20 turns**. Prefer Glob over Read for existence checks. No State rewrites, no carry-forward.
 
@@ -64,7 +64,7 @@ Decide: existing article OR new stub?
 
   # <Title>
 
-  > Surfaced via gemma4 vision pass on ${today}.
+  > Surfaced via the picture vision pass on ${today}.
 
   ## Evidence
 

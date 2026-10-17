@@ -1,6 +1,6 @@
 """Tests for `collectors/scan_screenshots.py:ScreenshotsCollector`.
 
-The scan path is vision-LLM-bound (gemma4 over Ollama), so the run()
+The scan path is vision-LLM-bound (a local vision model over Ollama), so the run()
 tests monkeypatch `scan()` to a canned result dict and assert the
 RunResult mapping. Pure helpers (timestamp parsing, RunResult bridging)
 are tested directly.

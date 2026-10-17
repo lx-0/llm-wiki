@@ -62,7 +62,7 @@ For each substantive pattern in the source (typically marked by `## <name>` + `*
 
 Then emit `{"status": "ok", "concepts_created": [<list of slugs>], "concepts_updated": [<list>]}` and STOP.
 
-Max 5 Edits + 3 Writes total (≤ 8 file mods). If the source has more than 3 substantive patterns, pick the 3 most distinctive ones — additional patterns surface on the next sync if the operator updates the memory.
+Max 5 Edits + 3 Writes total (≤ 8 file mods). If the source has more than 3 substantive patterns, pick the 3 most distinctive ones — the rest surface when the memory file changes and is compiled again.
 
 ## Hard rules (both modes)
 

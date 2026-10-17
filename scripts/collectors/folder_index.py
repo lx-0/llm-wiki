@@ -354,7 +354,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.root_id:
         if any(e.get("id") == args.root_id for e in smb):
-            log.error("root %r is kind=smb — NAS indexing lands in S06.", args.root_id)
+            log.error("root %r is kind=smb — the engine has no SMB reader yet.", args.root_id)
             return 1
         local = [e for e in local if e.get("id") == args.root_id]
         if not local:
@@ -364,7 +364,7 @@ def main(argv: list[str] | None = None) -> int:
         smb = []
 
     for e in smb:
-        log.info("skipping %s (kind=smb — NAS indexing lands in S06)", e.get("id"))
+        log.info("skipping %s (kind=smb — the engine has no SMB reader yet)", e.get("id"))
     if not local:
         log.info(
             "no kind=local watched_folders configured — add entries under "

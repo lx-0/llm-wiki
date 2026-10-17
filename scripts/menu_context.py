@@ -1,14 +1,16 @@
 """Context probe for the interactive `wiki` home screen.
 
-Reads vault state cheaply and emits a JSON array of actionable suggestions
-to stdout, ranked by priority. The bash entry-point parses the array and
-renders it as the "Pending in your vault" section of the home screen.
+Reads vault state cheaply and builds the status and the actionable suggestions,
+ranked by priority. `menu.py` imports `build_status` / `build_suggestions` and
+renders them as the "Pending in your vault" section of the home screen;
+`wiki menu --json` runs this module and prints the object below (the desktop app
+and the oracle read it).
 
 Design constraints:
     * No LLM, no network, no shell-out.
     * Pure stdlib + the engine's own `core.paths` / `core.config`.
-    * Hard 500ms wall-clock cap (SIGALRM); on timeout we emit `[]` so the
-      menu falls back to browse-only rendering.
+    * Hard wall-clock cap (`WALL_CLOCK_BUDGET_S`, 500 ms, SIGALRM); on timeout
+      the payload carries what was built so far.
     * Per-probe try/except so a single broken signal never kills the rest.
 
 Output schema (stdout, one line) — `schema` is `core.actions.SCHEMA`:
@@ -33,9 +35,9 @@ Output schema (stdout, one line) — `schema` is `core.actions.SCHEMA`:
       ]
     }
 
-Errors and warnings go to stderr. Exit code is always 0 — the bash layer
-treats parse failure / empty object as "no status + no suggestions, render
-browse only".
+Errors and warnings go to stderr. Exit code is always 0 — a reader that cannot
+parse the object, or gets an empty one, has no status and no suggestions to
+show (browse only).
 """
 
 from __future__ import annotations

@@ -30,9 +30,9 @@ def _registry_piggyback_specs() -> dict[str, int]:
     Uses the STATIC declaration (all_collectors + SPEC.piggyback_default), not
     `piggyback_collectors()` — that helper additionally filters by
     `is_configured()`, which depends on the test environment's CONFIG.
+    `all_collectors()` imports every module in `collectors.MODULES` (the package
+    itself imports none since M034-S06-T03).
     """
-    import collectors  # noqa: F401  — imports all submodules → registration
-
     return {
         c.SPEC.name: c.SPEC.piggyback_cooldown_hours
         for c in all_collectors()

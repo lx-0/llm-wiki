@@ -12,5 +12,6 @@ pin priority entries; the Dataview block below picks up everything in
 ```dataview
 LIST
 FROM "knowledge/people"
-WHERE compile_role != "final-only"SORT file.name ASC
+WHERE compile_role != "final-only"
+SORT file.name ASC
 ```

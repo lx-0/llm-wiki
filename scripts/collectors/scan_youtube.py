@@ -2,10 +2,11 @@
 Scan YouTube URLs (single video, playlist, or inbox-list) and write tiered
 metadata + transcript + comments into raw/notes/youtube/.
 
-First-aufschlag scope: Tier 0 (yt-dlp metadata), Tier 1 (subtitles via
-youtube-transcript-api with yt-dlp fallback), Tier 2 (top comments via
-yt-dlp). All free, no LLM. Tier 3 (gemma4 frame-sampling / Gemini cloud)
-is a follow-up — see .ytstack/backlog/youtube-intake.md.
+Tiers: 0 (yt-dlp metadata), 1 (subtitles via youtube-transcript-api with
+yt-dlp fallback), 2 (top comments via yt-dlp) — all free, no LLM — and 3
+(ffmpeg frame sampling, each frame described by the local vision model,
+`models.vision_model` over Ollama). A cloud Tier 3 is a follow-up — see
+.ytstack/backlog/youtube-intake.md.
 
 Wired in two ways:
   - As a Registry-discovered Collector: `wiki collect youtube`. The
@@ -294,7 +295,7 @@ def slim_comments(raw_comments: list[dict] | None, *, top_n: int = 20) -> list[d
     return [trim(c) for c in picked]
 
 
-# ── Tier 3-local: ffmpeg frame sampling + gemma4 vision ──────────────
+# ── Tier 3-local: ffmpeg frame sampling + the local vision model ─────
 
 FRAME_PROMPT = """You are analyzing ONE FRAME from a YouTube video for a knowledge wiki.
 
@@ -436,7 +437,7 @@ def fetch_visual_local(
     metadata: dict,
     transcript: dict | None,
 ) -> dict | None:
-    """T3-local: download video, sample frames, gemma4 vision per frame, aggregate."""
+    """T3-local: download video, sample frames, the vision model per frame, aggregate."""
     from core import ollama_client
 
     if not ollama_client.is_reachable():

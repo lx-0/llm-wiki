@@ -193,8 +193,9 @@ right one for the question; don't conflate them.
   ```
 
   Pick a suggestion by reading `argv`, then invoke `wiki <argv…>`
-  directly. Don't ask the menu to dispatch — bash is single source of
-  truth for what each subcommand does.
+  directly. Don't ask the menu to dispatch — `wiki <argv…>` (the
+  command catalogue behind `wiki help`) is the single source of truth
+  for what each subcommand does.
 
 ## Contribute tier
 

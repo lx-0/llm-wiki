@@ -6,8 +6,9 @@ final article body". Concretely:
 
 - prompt assembly via ``core.prompts.render(metadata.substrate_prompt, …)``
 - owner-block injection (``_build_owner_block``)
-- pre-flight 60kb budget gate (``assert_prompt_within_budget``)
-- 60kb operator-visible size warning
+- pre-flight prompt-size gate (``assert_prompt_within_budget``,
+  ``limits.compile_max_prompt_chars``, default 400,000 chars)
+- 60kb operator-visible size warning (a fragile-size class, not a gate)
 - one ``run_sdk_query`` call, Write/Edit path-scoped to knowledge/ by the
   PreToolUse hook (or the legacy allowed_tools shape when
   ``CONFIG.features.compile_callback_gate`` is off)
@@ -227,11 +228,10 @@ async def compile_source(content: str, metadata: CompileMetadata) -> CompileResu
     Skip reasons cover prompt_too_large / compile_per_call_timeout /
     long_context_kind_unknown / max_turns_exhausted /
     kind_unknown_small_source. Failure kinds are the FailureClass values
-    (rate_limit, cli_crash, auth, model, network, agent_error,
-    cost_exceeded, …).
+    (rate_limit, cli_crash, auth, model, network, …).
 
     Knobs read from CONFIG.limits:
-    - compile_max_prompt_chars (60kb pre-flight)
+    - compile_max_prompt_chars (pre-flight prompt-size gate, default 400,000 chars)
     - compile_per_call_timeout_s (per-message stall)
     - compile_retry_long_context_on_unknown + compile_retry_long_context_min_source_chars
       + compile_failure_backoff_s (one-shot retry-on-kind-unknown ladder)

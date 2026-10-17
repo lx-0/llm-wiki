@@ -401,8 +401,9 @@ EXAMPLES
   wiki ingest-youtube --inbox raw/inbox/youtube.md --tier 1
 
 NOTES
-  Wraps scripts/collectors/scan_youtube.py. T0–T2 are free (no LLM). T3 (visual
-  via gemma4@kcma or Gemini 2.5) is on the backlog — see
+  Wraps scripts/collectors/scan_youtube.py. T0–T2 are free (no LLM). T3 samples
+  frames (ffmpeg) and has the local vision model (models.vision_model, Ollama)
+  describe them — slow, no API cost. A cloud T3 is on the backlog — see
   .ytstack/backlog/youtube-intake.md."""
 
 H_CURIOSITY = """wiki curiosity — review + run curiosity-loop deep-scan requests
@@ -509,7 +510,7 @@ WHAT IT DOES
 
   Knobs: limits.folder_index_max_depth (0 = unlimited; raise only as a
   walk-cost bound for huge NAS roots) / folder_index_recent_n.
-  kind=smb (NAS) entries are skipped — NAS indexing lands in S06."""
+  kind=smb (NAS) entries are skipped — the engine has no SMB reader yet."""
 
 H_PRODUCE = """wiki produce — run a Producer (post-compile derivative-material extractor)
 

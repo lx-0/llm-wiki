@@ -14,7 +14,7 @@ ${source_content}
 
 ## Your task — extract concepts + back-link source screenshots
 
-A screenshot batch is a vision-LLM summary of 30-100 desktop captures from a single operator-session. Each screenshot has been tagged with App / Project / Summary / Tags by gemma4. Your job is **lean and additive**:
+A screenshot batch is a vision-LLM summary of 30-100 desktop captures from a single operator-session. Each screenshot has been tagged with App / Project / Summary / Tags by a local vision model. Your job is **lean and additive**:
 
 You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **30 turns**. Prefer Glob over Read for existence checks; one Write per substantive concept beats three Reads of "maybe related" articles. No State rewrites, no carry-forward, no resolution-detection — that's transcript-substrate work, not screenshot-substrate work.
 
@@ -52,7 +52,7 @@ Decide: existing article OR new stub?
 
   # <Concept Title>
 
-  > Surfaced via gemma4 vision pass on ${today}. Concrete evidence: <one-line summary distilled from the screenshot summaries>.
+  > Surfaced via the screenshot vision pass on ${today}. Concrete evidence: <one-line summary distilled from the screenshot summaries>.
 
   ## Observations
 

@@ -136,7 +136,7 @@ dashboard.md — agent-buttons already up to date
     
     
     # ── NAS (SMB) ─────────────────────────────────────────────────────────
-    # Future scan-nas.py / SMB-backed collectors. Leave blank when no NAS.
+    # Reserved for an SMB reader (watched_folders kind: smb); nothing reads these yet. Leave blank.
     NAS_HOST=
     NAS_USER=
     NAS_PASS=
@@ -1023,7 +1023,8 @@ dashboard.md — agent-buttons already up to date
     ```dataview
     LIST
     FROM "knowledge/areas"
-    WHERE compile_role != "final-only"SORT file.name ASC
+    WHERE compile_role != "final-only"
+    SORT file.name ASC
     ```
 + <VAULT>/knowledge/MOCs/concepts.md
     ---
@@ -1040,7 +1041,8 @@ dashboard.md — agent-buttons already up to date
     ```dataview
     LIST
     FROM "knowledge/concepts"
-    WHERE compile_role != "final-only"SORT file.name ASC
+    WHERE compile_role != "final-only"
+    SORT file.name ASC
     ```
 + <VAULT>/knowledge/MOCs/inbox-tasks.md
     ---
@@ -1157,7 +1159,8 @@ dashboard.md — agent-buttons already up to date
     ```dataview
     LIST
     FROM "knowledge/people"
-    WHERE compile_role != "final-only"SORT file.name ASC
+    WHERE compile_role != "final-only"
+    SORT file.name ASC
     ```
 + <VAULT>/knowledge/MOCs/projects.md
     ---
@@ -1174,7 +1177,8 @@ dashboard.md — agent-buttons already up to date
     ```dataview
     LIST
     FROM "knowledge/projects"
-    WHERE compile_role != "final-only"SORT file.name ASC
+    WHERE compile_role != "final-only"
+    SORT file.name ASC
     ```
 + <VAULT>/reports/studies/longitudinal-baseline/manifest.yaml
     study_id: longitudinal-baseline
