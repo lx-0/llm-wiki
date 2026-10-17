@@ -242,3 +242,9 @@ When a feature is retired:
 3. Add a DECISIONS.md entry if the retirement is non-obvious.
 
 When the docs make a claim, verify the implementation exists before merging — that's the whole point of this file.
+
+## Original wiki synchronization
+
+| Feature | Status | Implementation | Trigger | Known gaps |
+| --- | --- | --- | --- | --- |
+| Original paths, binaries, index and empty folders | 🟢 | `scripts/publish/{sources,source_sync,source_moves}.py` | `wiki publish`, `--backfill`, explicit `--move OLD=NEW` | Requires producer v3 server; private live adoption is separate from isolated acceptance. See `docs/setup-publish.md`. |

@@ -1,38 +1,53 @@
-"""`wiki publish` — mirror knowledge/ into meinkontext (M030).
-
-S01 ships the PLAN side: `--dry-run` prints exactly what a live publish would
-do (create/update/retract/unchanged, per the content-hash delta), with a
-`--json` seam for GUI/agent consumers. Live execution lands in S02.
-"""
+"""Original-file sync and article projection over the meinKontext producer contract."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from datetime import UTC
 from pathlib import Path
 
 from core.console import say
 from core.state_store import StateStore
 from publish.corpus import (
     DEFAULT_ROOTS,
-    count_non_markdown,
     load_manifest,
     manifest_store,
     map_slugs,
-    migrate_manifest_layout,
 )
 from publish.delta import PublishPlan, build_payloads, plan_delta
 from publish.describe import description_index
+from publish.sources import (
+    effective_moves,
+    inventory_sources,
+    move_batch_id,
+    source_plan,
+    validate_moves,
+)
 
 
 def build_publish_plan(
-    vault: Path, store: StateStore, roots: tuple[str, ...] = DEFAULT_ROOTS
+    vault: Path,
+    store: StateStore,
+    roots: tuple[str, ...] = DEFAULT_ROOTS,
+    moves: dict[str, str] | None = None,
 ) -> tuple[PublishPlan, dict[str, str]]:
     """Manifest (layout-migrated) → stable slug map → payloads → delta plan."""
-    migrate_manifest_layout(store)
-    manifest = load_manifest(store)
-    previous = {slug: entry.get("path", "") for slug, entry in manifest.items()}
+    manifest = {slug: dict(entry) for slug, entry in load_manifest(store).items()}
+    if store.load().get("layout") != "vault-rel":
+        for entry in manifest.values():
+            if entry.get("path") and not entry["path"].startswith("knowledge/"):
+                entry["path"] = "knowledge/" + entry["path"]
+    previous = {
+        slug: (moves or {}).get(entry.get("path", ""), entry.get("path", ""))
+        for slug, entry in manifest.items()
+    }
+    for entry in store.load().get("sources", {}).values():
+        if entry.get("article_id"):
+            previous.setdefault(
+                entry["article_id"], (moves or {}).get(entry["path"], entry["path"])
+            )
     slug_map = map_slugs(vault, roots, previous=previous)
     knowledge_dir = vault / "knowledge"
     index_file = knowledge_dir / "index.md"
@@ -106,6 +121,28 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="cadence mode: quiet no-op when publish is disabled",
     )
+    parser.add_argument(
+        "--move",
+        action="append",
+        default=[],
+        metavar="OLD=NEW",
+        help="reconcile a moved source without changing its identity",
+    )
+    parser.add_argument(
+        "--confirm-deletions",
+        action="store_true",
+        help="confirm deletion candidates after checking that they are not moves",
+    )
+    parser.add_argument(
+        "--accept-scope-change",
+        action="store_true",
+        help="accept a changed root list after reviewing its dry run",
+    )
+    parser.add_argument(
+        "--backfill",
+        action="store_true",
+        help="only attach original paths/bytes to existing articles; no article versions or archives",
+    )
     args = parser.parse_args(argv)
 
     if args.auth:
@@ -137,66 +174,161 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    roots = tuple(CONFIG.publish.roots)
-    store = manifest_store()
-    plan, slug_map = build_publish_plan(ROOT_DIR, store, roots)
-    non_md = count_non_markdown(ROOT_DIR, roots)
+    return run_publish(ROOT_DIR, CONFIG.publish, args)
 
-    by_root: dict[str, int] = {}
-    for rel in slug_map.values():
-        root = rel.split("/", 1)[0]
-        by_root[root] = by_root.get(root, 0) + 1
-    breakdown = " · ".join(f"{r} {n}" for r, n in sorted(by_root.items()))
 
-    if args.dry_run:
-        if args.as_json:
-            payload = to_json_payload(plan)
-            payload["non_markdown_skipped"] = non_md
-            say(json.dumps(payload, ensure_ascii=False))
-        else:
-            say(render_human(plan))
-            say(f"corpora: {breakdown}")
-            if non_md:
-                say(
-                    f"note: {non_md} non-markdown files in the publish roots have "
-                    "no contract channel (markdown-only) and are not published"
-                )
-        return 0
+def source_summary(sources) -> dict:
+    return {
+        "write": [
+            {"key": i.key, "path": i.file.path, "bytes": i.file.size, "directory": i.file.directory}
+            for i in sources.write
+        ],
+        "archive": [{"key": k, "path": e["path"]} for k, e in sources.archive],
+        "unchanged": sources.unchanged,
+        "bytes": sum(f.size for f in sources.inventory),
+    }
 
+
+def source_publish_plan(vault, store, roots, requested_moves, backfill):
+    moves = effective_moves(store.load(), requested_moves)
+    inventory = inventory_sources(vault, roots)
+    validate_moves(inventory, store.load(), moves)
+    plan, slug_map = build_publish_plan(vault, store, roots, moves)
+    sources = source_plan(
+        inventory,
+        store.load(),
+        slug_map,
+        moves,
+        {p.slug for p in plan.create + plan.update},
+        roots=roots,
+    )
+    if backfill:
+        sources.write = [
+            i
+            for i in sources.write
+            if i.article_id in store.load().get("articles", {}) and not i.previous
+        ]
+        sources.archive = []
+        plan = PublishPlan()
+    sources.move_batch = move_batch_id(requested_moves) if moves else None
+    return plan, slug_map, sources
+
+
+def run_publish(vault: Path, cfg, args) -> int:
+    import os
+    from datetime import datetime
+
+    from core.state_store import locked
     from publish.bootstrap import ensure_wiki, start_page_payload
     from publish.client import ContextMcpClient
+    from publish.corpus import migrate_manifest_layout
     from publish.executor import execute_publish
     from publish.oauth import current_access_token
+    from publish.source_sync import execute_source_publish, require_source_contract
 
-    cfg = CONFIG.publish
-
-    # Token order: explicit env override wins (must be a USER token — org
-    # api-keys are read-only for the write tools); default = the OAuth store
-    # minted by `wiki publish --auth`, refreshed headlessly — including
-    # mid-run via the client's forced-refresh path (JWTs expire in <1 h,
-    # a full publish runs longer).
-    import os
-
+    roots = tuple(cfg.roots)
+    store = manifest_store()
+    moves = {}
+    for move in args.move:
+        old, separator, new = move.partition("=")
+        if not separator or old in moves:
+            raise ValueError("--move expects distinct OLD=NEW source paths")
+        moves[old] = new
+    requested_moves = moves
+    plan, slug_map, sources = source_publish_plan(
+        vault, store, roots, requested_moves, args.backfill
+    )
+    summary = source_summary(sources)
+    if args.dry_run:
+        if args.as_json:
+            say(json.dumps({**to_json_payload(plan), "sources": summary}, ensure_ascii=False))
+        else:
+            say(render_human(plan))
+            say(
+                f"sources: {len(sources.write)} write, {len(sources.archive)} archive, {sources.unchanged} unchanged; {summary['bytes']} bytes"
+            )
+        return 0
+    target = {"endpoint": cfg.endpoint, "wiki": cfg.wiki_slug}
+    if store.load().get("source_target", target) != target:
+        raise ValueError(
+            "publish destination changed; use a separate manifest for the new destination"
+        )
     env_token = os.environ.get("MEINKONTEXT_TOKEN", "").strip()
-    if env_token:
-        client = ContextMcpClient(cfg.endpoint, env_token)
-    else:
 
-        def _provider(force: bool = False) -> str:
-            return current_access_token(force_refresh=force)
+    def provider(force: bool = False) -> str:
+        return current_access_token(force_refresh=force)
 
-        client = ContextMcpClient(cfg.endpoint, token_provider=_provider)
-
-    with client:
+    client = (
+        ContextMcpClient(cfg.endpoint, env_token)
+        if env_token
+        else ContextMcpClient(cfg.endpoint, token_provider=provider)
+    )
+    with locked(store.path.with_suffix(".publish.lock")), client:
+        # Re-plan under the run lock so a waiting invocation never uses stale revisions.
+        store.reload()
+        plan, slug_map, sources = source_publish_plan(
+            vault, store, roots, requested_moves, args.backfill
+        )
+        if (
+            store.load().get("source_roots", list(roots)) != list(roots)
+            and not args.accept_scope_change
+        ):
+            raise ValueError(
+                "publish roots changed; review --dry-run and explicitly --accept-scope-change"
+            )
+        if store.load().get("source_target", target) != target:
+            raise ValueError("publish destination changed while waiting for the run lock")
+        require_source_contract(client)
         ensure_wiki(client, cfg.wiki_slug, cfg.wiki_name)
-        start = start_page_payload(slug_map, cfg.wiki_name)
-        report = execute_publish(client, store, plan, start, cfg.wiki_slug)
-
+        migrate_manifest_layout(store)
+        store.update(lambda d: d.update({"source_target": target, "source_roots": list(roots)}))
+        store.update(
+            lambda d: d.update(
+                {
+                    "last_source_run": {
+                        "status": "running",
+                        "started_at": datetime.now(UTC).isoformat(),
+                        "files": len(sources.inventory),
+                        "bytes": sum(f.size for f in sources.inventory),
+                    }
+                }
+            )
+        )
+        report = execute_source_publish(
+            client,
+            store,
+            vault,
+            sources,
+            plan,
+            cfg.wiki_slug,
+            confirm_deletions=args.confirm_deletions,
+        )
+        store.update(
+            lambda d: d["last_source_run"].update(
+                {
+                    "status": "incomplete"
+                    if report["skipped"] or report.get("pending_deletions")
+                    else "complete",
+                    "finished_at": datetime.now(UTC).isoformat(),
+                    "report": report,
+                }
+            )
+        )
+        if not report["skipped"] and not report.get("pending_deletions") and not args.backfill:
+            execute_publish(
+                client,
+                store,
+                PublishPlan(),
+                start_page_payload(slug_map, cfg.wiki_name),
+                cfg.wiki_slug,
+            )
     if args.as_json:
-        say(json.dumps(report_json(report), ensure_ascii=False))
+        say(json.dumps(report, ensure_ascii=False))
     else:
-        say(render_report(report))
-    return 0
+        say(
+            f"sources: {report['written']} written, {report['archived']} archived, {report['unchanged']} unchanged, {len(report['skipped'])} rejected, {len(report.get('pending_deletions', []))} pending deletions"
+        )
+    return 1 if report["skipped"] or report.get("pending_deletions") else 0
 
 
 if __name__ == "__main__":

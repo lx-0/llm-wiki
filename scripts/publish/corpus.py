@@ -173,7 +173,7 @@ def manifest_store(path: Path | None = None) -> StateStore:
     """StateStore over the publish manifest (locked + atomic writes). A fresh
     instance per call so reloads observe the disk truth; the schema is
     additive — T04 adds hashes, S02 adds wiki metadata."""
-    return StateStore(path or DEFAULT_MANIFEST_PATH)
+    return StateStore(path or DEFAULT_MANIFEST_PATH, tolerant=False)
 
 
 def migrate_manifest_layout(store: StateStore) -> None:

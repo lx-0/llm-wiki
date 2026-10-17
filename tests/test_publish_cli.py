@@ -101,3 +101,27 @@ def test_command_catalog_has_publish_row() -> None:
     row = next(c for c in cli.COMMANDS if c.name == "publish")
     assert row.handler == "publish/cli.py"
     assert row.kind == "py"
+
+
+def test_backfill_dry_run_has_no_article_delta_and_does_not_migrate_journal(
+    tmp_path, monkeypatch, capsys
+):
+    import json
+    from types import SimpleNamespace
+
+    from publish import cli
+
+    vault, _ = _vault(tmp_path)
+    store = manifest_store(tmp_path / "publish.json")
+    store.update(
+        lambda d: d.update({"articles": {"foo": {"path": "concepts/foo.md", "hash": "old"}}})
+    )
+    before = store.path.read_bytes()
+    monkeypatch.setattr(cli, "manifest_store", lambda: store)
+    args = SimpleNamespace(move=[], backfill=True, dry_run=True, as_json=True)
+    cfg = SimpleNamespace(roots=("knowledge",))
+    assert cli.run_publish(vault, cfg, args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["create"] == result["update"] == result["retract"] == []
+    assert [row["path"] for row in result["sources"]["write"]] == ["knowledge/concepts/foo.md"]
+    assert store.path.read_bytes() == before

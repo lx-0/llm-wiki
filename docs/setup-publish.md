@@ -1,15 +1,16 @@
 # Setup: wiki publish — the meinkontext remote mirror
 
 `wiki publish` maintains a managed wiki on the operator's meinkontext
-(context-mcp) server as a **one-way mirror** of the vault's markdown. The
-vault stays the only source of truth; the server is registry + delivery.
+(context-mcp) server as a **one-way sync** of original vault files plus searchable markdown articles.
+The vault is authoring input; meinKontext's central database and S3 store serve the
+published snapshot over MCP.
 Binding contract: `docs/PRODUCER-CONTRACT.md` in the context-mcp repo — on
 disagreement, its REFERENCE PRODUCER RUN test wins.
 
 ## What publishes
 
-Every markdown file under the configured `publish.roots` (vault-relative
-folder names). Engine default is `["knowledge"]` — the curated wiki. The
+Every file under the configured `publish.roots` (vault-relative
+folder names), including original markdown, binaries, JSON, hidden files and empty folders. Engine default is `["knowledge"]` — the curated wiki. The
 ALLES posture (operator decision 2026-08-25: "Substrat und Destillat gehören
 zusammen") adds the substrate:
 
@@ -27,25 +28,25 @@ publish:
   - workspace
 ```
 
-Hard boundaries:
+Originals preserve their vault-relative paths, case, Unicode and exact bytes. Markdown
+also has the existing searchable article projection; original files retain wikilinks,
+frontmatter and line endings before that transformation. `knowledge/index.md` is included
+as an original; the generated start article remains separate.
 
-- **Markdown-only** (contract: one markdown file per article). Binary/JSON
-  assets (pictures, audio, request JSONs) have no channel and are counted in
-  the dry-run as `non-markdown files … not published`.
-- `knowledge/index.md` is excluded (a generated start page with MOC links
-  replaces it as the wiki entry point).
-- The **server secret gate** rejects articles containing secret-shaped
-  values (key blocks, `sk-` prefixes). Rejects are per-article fail-soft:
-  skipped, WARNING-logged, listed in the report — sanitize the article
-  locally or accept it staying local-only.
+Symlinks, missing/unreadable roots and unsupported filesystem entries stop inventory.
+The server secret gate applies to original bytes/path metadata and article projections.
+Rejected files remain explicitly reported, and that run does not archive anything.
+The only size limits are the existing organization quota and server request-body limit
+(including base64/JSON overhead). No silent file-count or extension exclusions.
 
 ## One-time connect
 
 Prerequisites: a running context-mcp (meinkontext) instance reachable over
 HTTPS and a **user account** on it — the browser consent in step 3 signs in
 as that user, and only user principals may write. An org api-key from the
-MCP-CONNECT setup is not enough (read-only). Nothing else is needed on the
-server side; `wiki publish` creates the managed wiki on first run.
+MCP-CONNECT setup is not enough (read-only). The server must support producer contract v3 (`write_wiki_file`,
+`move_wiki_files`, `write_article.source`); an older server is refused before writes.
+`wiki publish` creates the managed wiki on first run.
 
 1. `wiki config set publish.enabled true`
 2. `wiki config set publish.endpoint https://<your-context-mcp>/mcp`
@@ -65,18 +66,61 @@ Token notes:
   Keychain-backed shell export (`security find-generic-password …`) if you
   use the override at all.
 
-## Publishing
+## Publishing and first adoption
 
-- `wiki publish --dry-run` — the full plan (create/update/retract per
-  article, per-corpus totals, non-markdown count). Review this before the
-  first live run.
-- `wiki publish` — sequential execution. Idempotent by content hash: an
-  unchanged rerun performs zero writes. Transient 5xx (the server redeploys
-  on every merge) are retried with backoff; progress persists per article in
-  `.wiki/state/publish.json`, so an aborted run resumes where it stopped.
-- Deleting a file locally **archives** the article upstream on the next
-  publish (auditable history, never a hard delete); re-creating the file
-  restores it with its version history continuing.
+Keep publishing disabled while reviewing the destination and inventory. Preserve a private
+copy of `.wiki/state/publish.json`, a consistent vault snapshot, and the destination's
+backup/recovery receipt before first adoption. Dry runs work while disabled and write
+neither the journal nor the server.
+
+- `wiki publish --dry-run --json`: review article changes and original-file counts,
+  paths and byte totals for every configured root.
+- `wiki publish --backfill --dry-run --json`: only new original bindings for existing
+  manifest articles. After approving that diff, `wiki publish --backfill` executes it
+  without new article versions, start-page edits or archives.
+- `wiki publish`: synchronize the remaining originals and article changes. Each source
+  has a stable key, expected remote revision and durable operation ID. Original read-back
+  must match its SHA-256 before the private journal advances. An unchanged run has no
+  writes. Original and changed article commit together; conflicts roll both back.
+- `wiki publish --move 'old/path.md=new/path.md'`: reconcile a move already made in the
+  vault. Repeat the flag for a path swap; directories expand their known child paths.
+  Source identity and article slug survive; copies get new identities. A completed batch
+  may be repeated safely. Equal content never silently becomes move evidence.
+- Additions alongside removals keep deletions pending, including in later runs. Reconcile
+  moves or review the diff and pass `--confirm-deletions` for genuine removals. Deletion
+  archives history rather than purging it. Reappearing files restore the same identities.
+- Changing configured roots requires `--accept-scope-change` after reviewing the dry run.
+  Missing roots, changed inventories and rejected uploads never justify retractions.
+
+Only one local run holds the journal lock. After a lost response, rerun the same command
+with unchanged input: durable receipts prevent duplicate revisions. If a pending source
+changed, the run stops for reconciliation. Preserve the journal and restore the interrupted
+input from the private snapshot before replay; never discard pending operations to force
+progress. `last_source_run` records running/complete/incomplete and counts. A crash may
+leave running; that is interrupted, not success. Atomicity is per file, not a global vault
+snapshot. Transport retries and token refresh use the existing MCP client.
+
+To undo a path batch, use its saved before/after mappings and returned revisions in an
+inverse `move_wiki_files` request with new operation IDs. `expected_revision` rejects
+intervening writes; never force an old mapping over newer content. Preserve the confirmed
+inverse receipts in a private journal recovery copy before resuming. Rolling application
+code back leaves the additive server schema/data in place; no whole-store restore or
+wiki deletion/recreation is part of a path rollback.
+
+## Verifying originals
+
+`get_wiki(view: files)` lists original metadata and `wiki-source://file/<id>/<revision>`
+read links under live access. A stale URI is refused; list again. In meinKontext, the wiki
+Files tab and global Explorer show the same read-only source tree. Edits happen in the
+source vault. Relative links resolve inside accessible wiki files; embeds never load
+active or external content automatically.
+
+**Export original files** returns the original paths, bytes and empty directories plus
+`_meinkontext-export.json` (numbered if occupied). Verify lengths and hashes against the
+private source snapshot and remote read-back. Generated/unmapped legacy articles stay
+available through the ordinary export. Portable path collisions fail explicitly instead
+of overwriting or silently renaming files. Later files follow a shared wiki's live
+container link; revocation denies reads and exports.
 
 ## Cadence
 
