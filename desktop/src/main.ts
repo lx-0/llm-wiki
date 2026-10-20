@@ -406,6 +406,11 @@ ipcMain.handle(VAULT_RUN_STATUS_CHANNEL, () => ({ running: runningCommand() }));
 
 let tray: Tray | null = null;
 let panel: BrowserWindow | null = null;
+let quitting = false;
+
+app.on('before-quit', () => {
+  quitting = true;
+});
 
 const PANEL_WIDTH = 360;
 const PANEL_MIN_H = 160;
@@ -441,6 +446,12 @@ function createPanel(): BrowserWindow {
   }
   // Behave like a menubar popover: dismiss when it loses focus.
   win.on('blur', () => win.hide());
+  // Closing a popover dismisses it; the tray and hotkey still need this window.
+  win.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    win.hide();
+  });
   // Tell the renderer when it's visible so it polls ONLY while shown.
   win.on('show', () => win.webContents.send(PANEL_VISIBILITY_CHANNEL, true));
   win.on('hide', () => win.webContents.send(PANEL_VISIBILITY_CHANNEL, false));

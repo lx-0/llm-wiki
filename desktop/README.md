@@ -57,6 +57,7 @@ it. Installed app only, not `npm start`.
 npm ci
 npm start                    # vite + electron
 npm test                     # tsc --noEmit + svelte-check + vitest
+npm run test:panel           # real Electron: dismiss/reopen the panel, then Quit (requires a desktop)
 npm run lint                 # biome check   (from Claude Code: rtk proxy npm run lint)
 npm run shots                # every window × light/dark × state → out/shots/ + report.json
 npm run reinstall            # build the .app, install over /Applications/llm-wiki.app, relaunch
@@ -69,6 +70,10 @@ popover, and `out/shots/report.json` carries heights, content heights and page e
 `npm run reinstall` is the loop for what only the installed app shows (file access, login
 item); an unsigned app's Full Disk Access grant is keyed on its code hash and may need
 re-granting after a rebuild.
+
+Closing the panel dismisses it; the tray icon and ⌥-Space can open it again. Use **Quit**
+to exit the app. `test:panel` exercises this lifecycle with a disposable HOME and userData,
+without using the operator's vault or changing the capture daemon.
 
 The engine's `--json` payloads are a typed contract: `docs/contracts/{menu,doctor}.schema.json`
 (generated from `scripts/core/contracts.py`). `src/lib/contract.test.ts` validates the
